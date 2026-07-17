@@ -167,6 +167,16 @@
   .lb-name{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:0 6px; }
   .lb-val{ color:var(--dim); font-weight:800; flex-shrink:0; }
   .lb-empty{ font-size:11.5px; color:var(--dim); padding:6px 0; }
+  .guide-section-title{ font-family:'Fredoka'; color:var(--amber); font-size:13px; margin:12px 0 6px; }
+  .guide-section-title:first-child{ margin-top:0; }
+  .guide-p{ font-size:11.5px; color:var(--dim); line-height:1.5; margin:0 0 8px; }
+  .guide-rank-row{ display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px dashed rgba(244,239,230,.08); font-size:12px; }
+  .guide-rank-row .icon{ font-size:16px; width:22px; text-align:center; flex-shrink:0; }
+  .guide-rank-row .title{ flex:1; }
+  .guide-rank-row .days{ color:var(--dim); font-size:11px; flex-shrink:0; }
+  .guide-rarity-row{ padding:7px 0; border-bottom:1px dashed rgba(244,239,230,.08); font-size:12px; }
+  .guide-rarity-row .top{ display:flex; justify-content:space-between; font-weight:800; }
+  .guide-rarity-row .desc{ color:var(--dim); font-size:11px; margin-top:2px; }
 </style>
 </head>
 <body>
@@ -231,6 +241,7 @@
               </div>
       <div class="hint">Don't have a dino yet? Gift a Galaxy or 1,000 Bits on stream to join the club!</div>
       <button class="secondary" id="openLeaderboard" style="width:100%; margin-top:14px;">🏆 View Leaderboards</button>
+      <button class="secondary" id="openGuide" style="width:100%; margin-top:8px;">📖 How It Works</button>
       <div class="mode-link"><button class="linklike" id="toOwnerBtn">🔧 Streamer? Open the club dashboard →</button></div>
     </div>
   </div>
@@ -356,6 +367,20 @@
     </div>
     <div class="lb-list" id="leaderboardList"></div>
     <button class="secondary" id="closeLeaderboard" style="width:100%; margin-top:10px;">Close</button>
+  </div>
+</div>
+
+<div class="gate-overlay" id="guideOverlay" style="display:none">
+  <div class="lb-card">
+    <h3>📖 How It Works</h3>
+    <p>Everything about ranking up, rarity, and what's out there to collect.</p>
+    <div class="lb-tabs">
+      <button class="small guide-tab active" data-tab="ranks">🏆 Ranks</button>
+      <button class="small secondary guide-tab" data-tab="rarity">💎 Rarity</button>
+      <button class="small secondary guide-tab" data-tab="items">🎒 Items</button>
+    </div>
+    <div class="lb-list" id="guideContent"></div>
+    <button class="secondary" id="closeGuide" style="width:100%; margin-top:10px;">Close</button>
   </div>
 </div>
 
@@ -1397,6 +1422,59 @@ document.querySelectorAll('.lb-tab').forEach(btn=>{
     lbCategory = btn.dataset.cat;
     document.querySelectorAll('.lb-tab').forEach(b=> b.classList.toggle('secondary', b!==btn));
     renderLeaderboardList();
+  });
+});
+
+/* ============================ HOW IT WORKS GUIDE (built from live game data) ============================ */
+let guideTab = 'ranks';
+const SLOT_LABELS = { head:'Worn on the head', face:'Worn on the face', neck:'Worn at the neck', body:'Worn on the body', feet:'Worn on the feet', hand:'Carried', aura:'Covers the whole dino' };
+function renderGuide(){
+  const el = document.getElementById('guideContent');
+  if(guideTab === 'ranks'){
+    el.innerHTML = `
+      <div class="guide-section-title">Owner Rank</div>
+      <p class="guide-p">Give at least one Galaxy on a day to count it toward your rank — it's permanent and never resets, even when the daily club does. Ranks up automatically as your total days played grows:</p>
+      ${OWNER_RANKS.map(r=> `<div class="guide-rank-row"><span class="icon">${r.icon}</span><span class="title">${r.title}</span><span class="days">${r.days} day${r.days===1?'':'s'}+</span></div>`).join('')}
+      <div class="guide-section-title">Streaks</div>
+      <p class="guide-p">Your streak grows by 1 every consecutive day you give a Galaxy. Miss a day and it resets to 1 — but your <b>longest</b> streak ever is saved forever and is what the Leaderboard ranks you on.</p>
+      <div class="guide-section-title">Overall Rank</div>
+      <p class="guide-p">A combined score using total Galaxies given, days played, your longest streak, closet size, and how many rare-or-better dinos you've hatched. Consistency counts as much as spending — showing up regularly moves you up just as much as any single big gift.</p>
+    `;
+  } else if(guideTab === 'rarity'){
+    const rows = RARITY_TABLE.map(([label,key,pct])=>{
+      const meta = RARITY_META[key];
+      const descs = { common:'The baseline roll — most eggs hatch here.', uncommon:'A step up, still fairly common.',
+        rareholo:'Gets a foil shimmer effect — genuinely rare.', ultra:'Gold foil, a great pull.', secret:'Full rainbow foil — the rarest possible hatch.' };
+      return `<div class="guide-rarity-row"><div class="top"><span>${meta.symbol} ${label}</span><span>${(pct*100).toFixed(1)}%</span></div><div class="desc">${descs[key]}</div></div>`;
+    }).join('');
+    el.innerHTML = `
+      <div class="guide-section-title">Dinosaur Rarity</div>
+      <p class="guide-p">Rolled once, the moment your egg is created — this is permanent for that dino and shown as a colored badge on its card.</p>
+      ${rows}
+      <div class="guide-section-title">Life Stages</div>
+      <p class="guide-p">Every Galaxy after hatching evolves your dino one stage: ${STAGE_ORDER.map(s=>STAGE_LABEL[s]).join(' → ')}. Once fully grown, every further Galaxy unlocks a permanent closet item instead.</p>
+    `;
+  } else {
+    const bySlot = {};
+    ITEM_POOL.forEach(it=>{ const slot = SLOT_MAP[it.id]||'hand'; (bySlot[slot]=bySlot[slot]||[]).push(it); });
+    const order = ['head','face','neck','body','aura','feet','hand'];
+    el.innerHTML = `<p class="guide-p">All ${ITEM_POOL.length} items, unlocked one at a time — you'll never get the same one twice. Yours forever once collected.</p>` +
+      order.filter(s=>bySlot[s]).map(slot=>
+        `<div class="guide-section-title">${SLOT_LABELS[slot]} (${bySlot[slot].length})</div>
+         <div class="closet-grid">${bySlot[slot].map(it=>`<div class="closet-item"><span style="font-size:20px">${it.emoji}</span><span class="iname">${it.name}</span></div>`).join('')}</div>`
+      ).join('');
+  }
+}
+document.getElementById('openGuide').addEventListener('click', ()=>{
+  document.getElementById('guideOverlay').style.display = 'flex';
+  renderGuide();
+});
+document.getElementById('closeGuide').addEventListener('click', ()=>{ document.getElementById('guideOverlay').style.display = 'none'; });
+document.querySelectorAll('.guide-tab').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    guideTab = btn.dataset.tab;
+    document.querySelectorAll('.guide-tab').forEach(b=> b.classList.toggle('secondary', b!==btn));
+    renderGuide();
   });
 });
 
