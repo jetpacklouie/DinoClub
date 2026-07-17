@@ -12,7 +12,7 @@
     --canopy:#0d211c; --canopy-2:#153229; --canopy-3:#0a1a15; --fern:#3fae6c; --amber:#f2b134; --coral:#ff6f59;
     --bone:#f4efe6; --dim:#9db3ac; --line:rgba(244,239,230,.1);
     --ok:#3fae6c; --warn:#f2b134; --err:#ff6f59; --off:#5c6f68;
-    --shell:#cee8bd; --shell-2:#84a873; --screen:#7f9764; --screen-dark:#68804f; --health:#e0574a;
+    --shell:#cee8bd; --shell-2:#84a873; --screen:#7f9764; --screen-dark:#68804f; --health:#3fae6c; --bond:#e0574a;
   }
   *{ box-sizing:border-box; }
   html,body{ margin:0; min-height:100%; background:var(--canopy); font-family:'Nunito',sans-serif; color:var(--bone); }
@@ -86,7 +86,7 @@
   .bar-row{ display:flex; align-items:center; gap:6px; font-size:13px; margin-top:2px; }
   .bar-label{ width:48px; text-align:left; flex-shrink:0; }
   .bar-track{ flex:1; height:9px; background:var(--screen-dark); border-radius:4px; overflow:hidden; }
-  .bar-fill{ height:100%; } .bar-fill.health{ background:var(--health); } .bar-fill.bond{ background:#16240d; }
+  .bar-fill{ height:100%; } .bar-fill.health{ background:var(--health); } .bar-fill.bond{ background:var(--bond); }
   .sprite-zone{ position:relative; width:100%; height:150px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   #spriteCanvas3d{ width:150px; height:150px; image-rendering:auto; filter:contrast(1.04) saturate(1.08); }
   #screenContent{ display:none; width:100%; flex-direction:column; align-items:center; gap:4px; }
@@ -151,7 +151,7 @@
   .r-common{ background:#3a4842; color:#c7cfc9; } .r-uncommon{ background:#1e4a30; color:#8fe0a8; }
   .r-rareholo{ background:#1e3b52; color:#7ec8f2; } .r-ultra{ background:#4a3a12; color:#ffe08a; } .r-secret{ background:#4a1f18; color:#ffb199; }
   .mini-bar{ width:64px; height:7px; background:#0a1a15; border-radius:4px; overflow:hidden; display:inline-block; vertical-align:middle; }
-  .mini-fill{ height:100%; } .mini-fill.health{ background:var(--health); } .mini-fill.bond{ background:var(--amber); }
+  .mini-fill{ height:100%; } .mini-fill.health{ background:var(--health); } .mini-fill.bond{ background:var(--bond); }
   .egg-tag{ font-size:11px; color:var(--dim); }
   .detail-row td{ background:var(--canopy-3); }
   .detail-inner{ padding:10px 6px; display:flex; flex-wrap:wrap; gap:18px; align-items:flex-start; }
@@ -306,6 +306,11 @@
           <label>Hatch time (seconds)</label>
           <input id="hatchSecs" type="number" min="5" value="120">
           <button class="warn" id="resetBtn" style="width:100%; margin-top:12px">Reset day (everyone goes extinct)</button>
+          <div style="margin-top:16px; padding-top:14px; border-top:1px dashed rgba(255,111,89,.3);">
+            <div style="font-size:10.5px; color:var(--coral); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;">⚠️ Danger zone</div>
+            <div class="lead" style="margin-bottom:8px;">Wipes every member's rank, streak, and closet — not just today. For clearing test data or a yearly fresh start.</div>
+            <button class="warn" id="fullResetBtn" style="width:100%; background:#7a1c12;">💥 Full Reset (Everyone, Forever)</button>
+          </div>
         </div>
       </div>
       <div class="col-right">
@@ -354,6 +359,10 @@
   </div>
 </div>
 
+<div class="gate-overlay" id="fullResetOverlay" style="display:none">
+  <div class="gate-card" id="fullResetBody"></div>
+</div>
+
 <script type="module">
 /* ============================ FIREBASE ============================
    Replaces Claude's artifact storage entirely. This file now runs anywhere —
@@ -395,8 +404,8 @@ const ITEM_POOL = [
   {id:'tophat', name:'Top Hat', emoji:'🎩'}, {id:'crown', name:'Tiny Crown', emoji:'👑'},
   {id:'sunglasses', name:'Cool Shades', emoji:'🕶️'}, {id:'cap', name:'Backwards Cap', emoji:'🧢'},
   {id:'sunhat', name:'Sun Hat', emoji:'👒'}, {id:'scarf', name:'Cozy Scarf', emoji:'🧣'},
-  {id:'bowtie', name:'Bow Tie', emoji:'🎀'}, {id:'ring', name:'Shiny Ring', emoji:'💍'},
-  {id:'watch', name:'Wrist Watch', emoji:'⌚'}, {id:'gloves', name:'Little Gloves', emoji:'🧤'},
+  {id:'bowtie', name:'Bow Tie', emoji:'🎀'}, {id:'mustache', name:'Fancy Mustache', emoji:'🥸'},
+  {id:'jetpack', name:'Jetpack', emoji:'🚀'}, {id:'glitter', name:'Glitter Coating', emoji:'✨'},
   {id:'socks', name:'Stripy Socks', emoji:'🧦'}, {id:'sneakers', name:'Sneakers', emoji:'👟'},
   {id:'boots', name:'Rain Boots', emoji:'🥾'}, {id:'sandals', name:'Sandals', emoji:'🩴'},
   {id:'skates', name:'Roller Skates', emoji:'🛼'}, {id:'vest', name:'Explorer Vest', emoji:'🦺'},
@@ -422,11 +431,11 @@ const ITEM_BY_ID = Object.fromEntries(ITEM_POOL.map(i=>[i.id,i]));
 /* Where each item actually sits on the dino: head-worn, face-worn, neck, body, feet, or held. */
 const SLOT_MAP = {
   tophat:'head', crown:'head', cap:'head', sunhat:'head', wizardhat:'head', bandana:'head', flower:'head',
-  sunglasses:'face', goggles:'face', mask:'face',
+  sunglasses:'face', goggles:'face', mask:'face', mustache:'face',
   scarf:'neck', bowtie:'neck', medal:'neck', ribbon:'neck',
-  vest:'body', jersey:'body', cape:'body',
+  vest:'body', jersey:'body', cape:'body', jetpack:'body',
   socks:'feet', sneakers:'feet', boots:'feet', sandals:'feet', skates:'feet',
-  ring:'hand', watch:'hand', gloves:'hand',
+  glitter:'aura',
   harmonica:'hand', guitar:'hand', trumpet:'hand', violin:'hand', drum:'hand', banjo:'hand',
   accordion:'hand', keyboard:'hand', maracas:'hand', horn:'hand',
   hammer:'hand', wand:'hand', camera:'hand', paintbrush:'hand', palette:'hand', kite:'hand',
@@ -663,6 +672,50 @@ async function resetDay(){
   showToast('🌅 A new day begins — everyone has gone extinct. Fresh eggs only!');
 }
 
+/* Full Reset — wipes permanent progress for every member, not just today's roster.
+   Two deliberate steps (typing an exact phrase, then a final explicit confirm showing
+   the real scope) rather than a simple double-click, since this has no undo. */
+let fullResetStage = 0;
+function openFullReset(){ fullResetStage = 1; renderFullResetModal(); document.getElementById('fullResetOverlay').style.display = 'flex'; }
+function closeFullReset(){ fullResetStage = 0; document.getElementById('fullResetOverlay').style.display = 'none'; }
+function renderFullResetModal(){
+  const body = document.getElementById('fullResetBody');
+  if(fullResetStage === 1){
+    body.innerHTML = `
+      <h3 style="color:var(--coral)">⚠️ Full Reset</h3>
+      <p>This permanently wipes <b>every</b> member's rank, streak, closet, and history across all time — not just today's roster. There is no undo.</p>
+      <p>Type <b>RESET EVERYTHING</b> below to continue.</p>
+      <input id="fullResetInput" placeholder="Type here" autocomplete="off">
+      <button class="warn" id="fullResetNext" style="width:100%" disabled>Continue</button>
+      <button class="secondary" id="fullResetCancel" style="width:100%">Cancel</button>
+    `;
+    const input = document.getElementById('fullResetInput');
+    const nextBtn = document.getElementById('fullResetNext');
+    input.addEventListener('input', ()=>{ nextBtn.disabled = input.value.trim().toUpperCase() !== 'RESET EVERYTHING'; });
+    input.focus();
+    nextBtn.addEventListener('click', ()=>{ fullResetStage = 2; renderFullResetModal(); });
+    document.getElementById('fullResetCancel').addEventListener('click', closeFullReset);
+  } else {
+    const count = Object.keys(ownerStats).length;
+    body.innerHTML = `
+      <h3 style="color:var(--coral)">Are you absolutely sure?</h3>
+      <p><b>${count}</b> club member${count===1?'':'s'} recorded, ever — all of it (ranks, streaks, closets, trophies) will be gone permanently. Today's roster goes too.</p>
+      <button class="warn" id="fullResetFinal" style="width:100%; background:#7a1c12;">Yes, permanently reset everything</button>
+      <button class="secondary" id="fullResetCancel2" style="width:100%">Cancel</button>
+    `;
+    document.getElementById('fullResetFinal').addEventListener('click', executeFullReset);
+    document.getElementById('fullResetCancel2').addEventListener('click', closeFullReset);
+  }
+}
+async function executeFullReset(){
+  roster = []; ownerStats = {}; galaxyQueue = [];
+  closeFullReset();
+  await save();
+  renderCurrentView();
+  showToast('💥 Full reset complete — every member and all history has been wiped.');
+}
+document.getElementById('fullResetBtn').addEventListener('click', openFullReset);
+
 /* ============================ PLAYER VIEW ============================ */
 let current = null;
 let closetOpen = false;
@@ -685,13 +738,13 @@ const key3d = new THREE.DirectionalLight(0xfff3e0, 0.95); key3d.position.set(2,3
 const fill3d = new THREE.DirectionalLight(0xb9d6ff, 0.35); fill3d.position.set(-2,1,-1.5); scene3d.add(fill3d);
 
 const SPECIES_CFG_3D = {
-  rex:    {legs:2, headR:0.30, bodyR:0.44, neckLen:0.12, tailLen:0.80, arms:true},
+  rex:    {legs:2, headR:0.32, bodyR:0.44, neckLen:0.12, tailLen:0.80, arms:true, carnivore:true},
   tri:    {legs:4, headR:0.30, bodyR:0.46, neckLen:0.04, tailLen:0.58, frill:true, horns:true},
-  raptor: {legs:2, headR:0.23, bodyR:0.31, neckLen:0.14, tailLen:0.95, crestSmall:true},
-  steggo: {legs:4, headR:0.24, bodyR:0.46, neckLen:0.04, tailLen:0.65, plates:true},
-  ptera:  {legs:2, headR:0.24, bodyR:0.31, neckLen:0.10, tailLen:0.35, wings:true, beak:true},
+  raptor: {legs:2, headR:0.23, bodyR:0.31, neckLen:0.14, tailLen:0.95, crestSmall:true, sickleClaw:true},
+  steggo: {legs:4, headR:0.24, bodyR:0.46, neckLen:0.04, tailLen:0.65, plates:true, tailSpikes:true},
+  ptera:  {legs:2, headR:0.24, bodyR:0.31, neckLen:0.10, tailLen:0.35, wings:true, beak:true, pteraCrest:true},
   bronto: {legs:4, headR:0.20, bodyR:0.50, neckLen:0.95, tailLen:1.05},
-  anky:   {legs:4, headR:0.24, bodyR:0.47, neckLen:0.04, tailLen:0.65, armor:true, club:true},
+  anky:   {legs:4, headR:0.24, bodyR:0.47, neckLen:0.04, tailLen:0.65, armor:true, club:true, sideSpikes:true},
   para:   {legs:4, headR:0.26, bodyR:0.41, neckLen:0.14, tailLen:0.72, crestTube:true},
 };
 function shade3D(colorNum, amt){
@@ -709,7 +762,7 @@ function buildMiniDino(species, colorHex){
   const black = new THREE.MeshPhongMaterial({ color:0x1a1410, shininess:5, flatShading:true });
 
   const bodyY = 0.42;
-  const body = new THREE.Mesh(new THREE.SphereGeometry(cfg.bodyR,8,6), mat);
+  const body = new THREE.Mesh(new THREE.SphereGeometry(cfg.bodyR,10,8), mat);
   body.scale.set(1,0.85,1.15); body.position.y = bodyY;
   g.add(body);
 
@@ -717,7 +770,7 @@ function buildMiniDino(species, colorHex){
   const legPositions = cfg.legs===2 ? [[0,-0.03],[0,0.18]]
     : [[cfg.bodyR*0.55,-cfg.bodyR*0.6],[-cfg.bodyR*0.55,-cfg.bodyR*0.6],[cfg.bodyR*0.55,cfg.bodyR*0.6],[-cfg.bodyR*0.55,cfg.bodyR*0.6]];
   legPositions.forEach(([lx,lz])=>{
-    const leg = new THREE.Mesh(new THREE.CylinderGeometry(legR,legR*0.9,legH,6), darkMat);
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(legR,legR*0.9,legH,7), darkMat);
     leg.position.set(lx, bodyY-0.15-legH/2, lz);
     g.add(leg);
   });
@@ -725,7 +778,7 @@ function buildMiniDino(species, colorHex){
   const headGroup = new THREE.Group();
   const frontZ = -(cfg.bodyR*0.85);
   if(cfg.neckLen > 0.25){
-    const neck = new THREE.Mesh(new THREE.CylinderGeometry(cfg.headR*0.5, cfg.bodyR*0.4, cfg.neckLen, 6), mat);
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(cfg.headR*0.5, cfg.bodyR*0.4, cfg.neckLen, 7), mat);
     neck.position.set(0, bodyY+cfg.neckLen*0.4, frontZ-0.06);
     neck.rotation.x = -0.5;
     g.add(neck);
@@ -733,10 +786,19 @@ function buildMiniDino(species, colorHex){
   } else {
     headGroup.position.set(0, bodyY+0.1, frontZ-0.1);
   }
-  headGroup.add(new THREE.Mesh(new THREE.SphereGeometry(cfg.headR,8,6), mat));
-  const snout = new THREE.Mesh(new THREE.SphereGeometry(cfg.headR*0.55,7,5), mat);
+  headGroup.add(new THREE.Mesh(new THREE.SphereGeometry(cfg.headR,10,8), mat));
+  const snout = new THREE.Mesh(new THREE.SphereGeometry(cfg.headR*0.55,8,6), mat);
   snout.position.set(0,-cfg.headR*0.15,-cfg.headR*0.85);
   headGroup.add(snout);
+  if(cfg.carnivore){
+    const toothMat = new THREE.MeshPhongMaterial({ color:0xf4efe6, shininess:20, flatShading:true });
+    for(let t=-1;t<=1;t+=2){
+      const tooth = new THREE.Mesh(new THREE.ConeGeometry(cfg.headR*0.06, cfg.headR*0.2, 5), toothMat);
+      tooth.position.set(t*cfg.headR*0.28, -cfg.headR*0.42, -cfg.headR*1.05);
+      tooth.rotation.x = Math.PI;
+      headGroup.add(tooth);
+    }
+  }
   const eyes = [];
   [-1,1].forEach(side=>{
     const eyeW = new THREE.Mesh(new THREE.SphereGeometry(cfg.headR*0.26,6,5), white);
@@ -749,7 +811,7 @@ function buildMiniDino(species, colorHex){
   });
   g.add(headGroup);
 
-  const tail = new THREE.Mesh(new THREE.CylinderGeometry(cfg.bodyR*0.38, 0.03, cfg.tailLen, 6), mat);
+  const tail = new THREE.Mesh(new THREE.CylinderGeometry(cfg.bodyR*0.38, 0.03, cfg.tailLen, 7), mat);
   tail.position.set(0, bodyY+0.03, cfg.bodyR*0.7+cfg.tailLen*0.45);
   tail.rotation.x = Math.PI/2+0.3;
   g.add(tail);
@@ -776,6 +838,14 @@ function buildMiniDino(species, colorHex){
       g.add(plate);
     }
   }
+  if(cfg.tailSpikes){
+    for(let s=-1;s<=1;s+=2){
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(0.08,0.26,5), white);
+      spike.position.set(s*0.1, bodyY, cfg.bodyR*0.7+cfg.tailLen*0.82);
+      spike.rotation.x = Math.PI/2.2; spike.rotation.z = s*0.3;
+      g.add(spike);
+    }
+  }
   if(cfg.wings){
     [-1,1].forEach(side=>{
       const wing = new THREE.Mesh(new THREE.ConeGeometry(0.24,0.6,4), mat);
@@ -790,11 +860,27 @@ function buildMiniDino(species, colorHex){
     beak.rotation.x = Math.PI/2;
     g.add(beak);
   }
+  if(cfg.pteraCrest){
+    const crest = new THREE.Mesh(new THREE.ConeGeometry(0.09,0.34,5), darkMat);
+    crest.position.set(0, headGroup.position.y+cfg.headR*0.6, headGroup.position.z+cfg.headR*0.55);
+    crest.rotation.x = -1.15;
+    g.add(crest);
+  }
   if(cfg.armor){
     for(let i=-1;i<=1;i++) for(let j=-1;j<=1;j+=2){
       const bump = new THREE.Mesh(new THREE.SphereGeometry(0.07,5,5), darkMat);
       bump.position.set(j*cfg.bodyR*0.4, bodyY+0.26, i*0.28);
       g.add(bump);
+    }
+  }
+  if(cfg.sideSpikes){
+    for(let i=-1;i<=1;i++){
+      [-1,1].forEach(side=>{
+        const spike = new THREE.Mesh(new THREE.ConeGeometry(0.055,0.16,5), white);
+        spike.position.set(side*cfg.bodyR*0.85, bodyY+0.05, i*0.3);
+        spike.rotation.z = side*1.2;
+        g.add(spike);
+      });
     }
   }
   if(cfg.club){
@@ -812,6 +898,14 @@ function buildMiniDino(species, colorHex){
     const crest = new THREE.Mesh(new THREE.ConeGeometry(0.055,0.15,5), darkMat);
     crest.position.set(0, headGroup.position.y+cfg.headR*0.9, headGroup.position.z);
     g.add(crest);
+  }
+  if(cfg.sickleClaw){
+    [-1,1].forEach(side=>{
+      const claw = new THREE.Mesh(new THREE.ConeGeometry(0.045,0.2,5), white);
+      claw.position.set(side*0.14, 0.14, cfg.bodyR*0.15);
+      claw.rotation.x = -1.5; claw.rotation.z = side*0.25;
+      g.add(claw);
+    });
   }
   if(cfg.arms){
     [-1,1].forEach(side=>{
@@ -832,6 +926,11 @@ function buildMiniDino(species, colorHex){
       new THREE.Vector3(0, bodyY-0.02, frontZ-0.32),
       new THREE.Vector3(cfg.bodyR*0.55, bodyY-0.02, frontZ-0.05),
       new THREE.Vector3(-cfg.bodyR*0.55, bodyY-0.02, frontZ-0.05),
+    ],
+    aura: [
+      new THREE.Vector3(cfg.bodyR*0.7, bodyY+0.35, cfg.bodyR*0.2),
+      new THREE.Vector3(-cfg.bodyR*0.65, bodyY+0.15, -cfg.bodyR*0.3),
+      new THREE.Vector3(0, bodyY+0.5, -cfg.bodyR*0.4),
     ],
   };
 
@@ -875,18 +974,25 @@ function applyEquippedAccessories(group, equippedIds){
   const anchors = group.userData.anchors;
   if(!anchors) return;
   let handIndex = 0;
-  (equippedIds||[]).forEach(id=>{
-    const item = ITEM_BY_ID[id]; if(!item) return;
-    const slot = SLOT_MAP[id] || 'hand';
-    let pos;
-    if(slot==='hand'){ pos = anchors.hand[handIndex % anchors.hand.length]; handIndex++; }
-    else pos = anchors[slot] || anchors.body;
-    const spr = makeEmojiSprite(item.emoji, slot==='head' ? 0.34 : 0.27);
+  function addSprite(emoji, pos, size){
+    const spr = makeEmojiSprite(emoji, size);
     spr.position.copy(pos);
     spr.userData.basePos = pos.clone();
     spr.userData.bobPhase = Math.random()*Math.PI*2;
     group.add(spr);
     group.userData.accessories.push(spr);
+  }
+  (equippedIds||[]).forEach(id=>{
+    const item = ITEM_BY_ID[id]; if(!item) return;
+    const slot = SLOT_MAP[id] || 'hand';
+    if(slot==='aura'){
+      (anchors.aura||[]).forEach(pos=> addSprite(item.emoji, pos, 0.16));
+      return;
+    }
+    let pos;
+    if(slot==='hand'){ pos = anchors.hand[handIndex % anchors.hand.length]; handIndex++; }
+    else pos = anchors[slot] || anchors.body;
+    addSprite(item.emoji, pos, slot==='head' ? 0.34 : 0.27);
   });
 }
 
@@ -1147,6 +1253,25 @@ function playDanceJingle(){
   const notes = [523.25,659.25,783.99,659.25,880.00,783.99,659.25,987.77];
   notes.forEach((freq,i)=> playTone(freq, 0.13, 'square', i*0.11, 0.11));
 }
+function playPetChime(){
+  // a bright little ascending sparkle — the "aw, happy dino" sound
+  [880.00, 1108.73, 1396.91].forEach((freq,i)=> playTone(freq, 0.16, 'triangle', i*0.06, 0.13));
+  playTone(1760.00, 0.2, 'triangle', 0.2, 0.09);
+}
+function playSnore(){
+  const ctx = ensureAudio(); if(!ctx) return;
+  const now = ctx.currentTime;
+  // inhale — low rising snort
+  const in1 = ctx.createOscillator(), inGain = ctx.createGain();
+  in1.type='sawtooth'; in1.frequency.setValueAtTime(90, now); in1.frequency.exponentialRampToValueAtTime(170, now+0.32);
+  inGain.gain.setValueAtTime(0.0001, now); inGain.gain.exponentialRampToValueAtTime(0.16, now+0.1); inGain.gain.exponentialRampToValueAtTime(0.0001, now+0.34);
+  in1.connect(inGain); inGain.connect(ctx.destination); in1.start(now); in1.stop(now+0.36);
+  // exhale — soft falling sigh
+  const out1 = ctx.createOscillator(), outGain = ctx.createGain();
+  out1.type='triangle'; out1.frequency.setValueAtTime(150, now+0.4); out1.frequency.exponentialRampToValueAtTime(65, now+0.75);
+  outGain.gain.setValueAtTime(0.0001, now+0.4); outGain.gain.exponentialRampToValueAtTime(0.1, now+0.48); outGain.gain.exponentialRampToValueAtTime(0.0001, now+0.78);
+  out1.connect(outGain); outGain.connect(ctx.destination); out1.start(now+0.4); out1.stop(now+0.8);
+}
 function playChomp(){
   const ctx = ensureAudio(); if(!ctx) return;
   const now = ctx.currentTime;
@@ -1178,6 +1303,7 @@ async function doInteraction(kind){
   } else if(kind==='pet'){
     fresh.happiness = Math.min(100, computeLiveBond(fresh) + 12);
     fresh.lastInteraction = Date.now(); fresh.last_pet = Date.now();
+    playPetChime();
     popFx('💖'); popFx('✨');
   } else if(kind==='dance'){
     fresh.happiness = Math.min(100, computeLiveBond(fresh) + 8);
@@ -1193,6 +1319,7 @@ async function doInteraction(kind){
   } else if(kind==='sleep'){
     fresh.health = computeLiveHealth(fresh); fresh.happiness = computeLiveBond(fresh);
     fresh.sleeping = !fresh.sleeping; fresh.lastFeed = Date.now(); fresh.lastInteraction = Date.now();
+    if(fresh.sleeping) playSnore();
   }
   writeBack(fresh); current = fresh;
   await save(); renderPlayerScreen();
