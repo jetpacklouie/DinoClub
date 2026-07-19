@@ -104,10 +104,6 @@
     border:none; box-shadow:0 4px 0 #a5730f, inset 0 2px 2px rgba(255,255,255,.65), 0 6px 10px rgba(0,0,0,.35); cursor:pointer; }
   .select-btn:active{ transform:translateY(3px); box-shadow:0 1px 0 #a5730f, inset 0 2px 2px rgba(255,255,255,.5); }
   .select-label{ font-family:'Fredoka'; font-weight:600; font-size:9.5px; letter-spacing:3px; color:#3f5a33; text-shadow:0 1px 0 rgba(255,255,255,.35); }
-  .sound-btn{ position:absolute; top:14px; right:16px; z-index:3; width:34px; height:34px; border-radius:50%; padding:0;
-    background:radial-gradient(circle at 34% 30%, #ffe9a8, #f7cf5e 45%, #d9930f); color:#3a2604; border:none; font-size:15px; line-height:1;
-    box-shadow:0 3px 0 #a5730f, inset 0 1px 2px rgba(255,255,255,.6); cursor:pointer; }
-  .sound-btn:active{ transform:translateY(2px); box-shadow:0 1px 0 #a5730f; }
 
   /* ---- Streak milestone celebration ---- */
   .milestone-overlay{ position:fixed; inset:0; z-index:95; display:flex; align-items:center; justify-content:center;
@@ -259,7 +255,6 @@
         <button id="searchBtn">Find</button>
       </div>
       <div class="device">
-        <button class="sound-btn" id="soundBtn" title="Test sound">🔊</button>
         <svg class="dino-print left" viewBox="0 0 100 100"><ellipse cx="50" cy="66" rx="24" ry="20"/><ellipse cx="24" cy="30" rx="11" ry="17" transform="rotate(-18 24 30)"/><ellipse cx="50" cy="16" rx="11" ry="17"/><ellipse cx="76" cy="30" rx="11" ry="17" transform="rotate(18 76 30)"/></svg>
         <svg class="dino-print right" viewBox="0 0 100 100"><ellipse cx="50" cy="66" rx="24" ry="20"/><ellipse cx="24" cy="30" rx="11" ry="17" transform="rotate(-18 24 30)"/><ellipse cx="50" cy="16" rx="11" ry="17"/><ellipse cx="76" cy="30" rx="11" ry="17" transform="rotate(18 76 30)"/></svg>
         <div class="pixel-dot" style="width:8px;height:8px;top:16%;left:10%;"></div>
@@ -1431,20 +1426,6 @@ function cycleActiveDino(){
   renderPlayerScreen();
 }
 document.getElementById('selectBtn').addEventListener('click', cycleActiveDino);
-
-/* Sound self-test: force-unlocks audio in a guaranteed gesture, then reports honestly.
-   If sounds are silent on someone's device, this button answers "is it us or the browser?" */
-document.getElementById('soundBtn').addEventListener('click', ()=>{
-  kickAudio();
-  setTimeout(()=>{
-    if(audioCtx && audioCtx.state === 'running'){
-      playPetChime();
-      showToast('🔊 Sound is on!');
-    } else {
-      showToast('🔇 Your browser is blocking audio — try opening this page directly in Chrome or Safari.');
-    }
-  }, 150);
-});
 
 /* ============================ STREAK MILESTONE CELEBRATION ============================ */
 const MILESTONE_TITLES = { 7:'ONE FULL WEEK!', 30:'A WHOLE MONTH!', 100:'CENTURY CLUB!' };
