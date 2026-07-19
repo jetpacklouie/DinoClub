@@ -87,6 +87,16 @@
   @keyframes caBlink{ 50%{ opacity:.3; } }
   @keyframes caTwinkle{ 0%,100%{ opacity:.25; transform:scale(.7) rotate(0deg); } 50%{ opacity:1; transform:scale(1.25) rotate(20deg); } }
 
+  /* ---- On-screen evolve prompt: honest about gift → Credit → evolve ---- */
+  .evolve-hint{ font-size:14px; line-height:1.25; margin-top:3px; padding:2px 8px; max-width:96%;
+    border:1px dashed rgba(22,36,13,.7); border-radius:8px; animation:hintBlink 1.9s ease-in-out infinite; }
+  @keyframes hintBlink{ 0%,100%{ opacity:1; } 50%{ opacity:.45; } }
+
+  /* ---- Name-your-egg form in the spend modal ---- */
+  .egg-name-form input{ width:100%; box-sizing:border-box; background:#0d1f17; border:1px solid rgba(244,239,230,.28);
+    border-radius:10px; padding:11px 12px; color:var(--cream); font-family:'Fredoka'; font-size:14.5px; outline:none; }
+  .egg-name-form input:focus{ border-color:var(--amber); box-shadow:0 0 0 2px rgba(242,177,52,.25); }
+
   /* ---- Physical SELECT button on the shell ---- */
   .select-row{ display:flex; flex-direction:column; align-items:center; margin-top:12px; gap:3px; position:relative; z-index:2; }
   .select-btn{ width:46px; height:46px; border-radius:50%; font-size:20px; padding:0; line-height:1;
@@ -94,6 +104,10 @@
     border:none; box-shadow:0 4px 0 #a5730f, inset 0 2px 2px rgba(255,255,255,.65), 0 6px 10px rgba(0,0,0,.35); cursor:pointer; }
   .select-btn:active{ transform:translateY(3px); box-shadow:0 1px 0 #a5730f, inset 0 2px 2px rgba(255,255,255,.5); }
   .select-label{ font-family:'Fredoka'; font-weight:600; font-size:9.5px; letter-spacing:3px; color:#3f5a33; text-shadow:0 1px 0 rgba(255,255,255,.35); }
+  .sound-btn{ position:absolute; top:14px; right:16px; z-index:3; width:34px; height:34px; border-radius:50%; padding:0;
+    background:radial-gradient(circle at 34% 30%, #ffe9a8, #f7cf5e 45%, #d9930f); color:#3a2604; border:none; font-size:15px; line-height:1;
+    box-shadow:0 3px 0 #a5730f, inset 0 1px 2px rgba(255,255,255,.6); cursor:pointer; }
+  .sound-btn:active{ transform:translateY(2px); box-shadow:0 1px 0 #a5730f; }
 
   /* ---- Streak milestone celebration ---- */
   .milestone-overlay{ position:fixed; inset:0; z-index:95; display:flex; align-items:center; justify-content:center;
@@ -251,6 +265,7 @@
         <button id="searchBtn">Find</button>
       </div>
       <div class="device">
+        <button class="sound-btn" id="soundBtn" title="Test sound">🔊</button>
         <svg class="dino-print left" viewBox="0 0 100 100"><ellipse cx="50" cy="66" rx="24" ry="20"/><ellipse cx="24" cy="30" rx="11" ry="17" transform="rotate(-18 24 30)"/><ellipse cx="50" cy="16" rx="11" ry="17"/><ellipse cx="76" cy="30" rx="11" ry="17" transform="rotate(18 76 30)"/></svg>
         <svg class="dino-print right" viewBox="0 0 100 100"><ellipse cx="50" cy="66" rx="24" ry="20"/><ellipse cx="24" cy="30" rx="11" ry="17" transform="rotate(-18 24 30)"/><ellipse cx="50" cy="16" rx="11" ry="17"/><ellipse cx="76" cy="30" rx="11" ry="17" transform="rotate(18 76 30)"/></svg>
         <div class="pixel-dot" style="width:8px;height:8px;top:16%;left:10%;"></div>
@@ -278,6 +293,7 @@
             <div class="p-rank" id="pRank"></div>
             <div class="p-rarity" id="pRarity"></div>
             <div class="p-meta" id="pMeta"></div>
+            <div class="evolve-hint" id="evolveHint" style="display:none"></div>
             <div class="egg-timer" id="eggTimer"></div>
           </div>
           <div id="creditAlert" style="display:none">
@@ -739,15 +755,17 @@ function spendOnNewEgg(owner, name){
   const stats = getOwnerStats(owner);
   if((stats.credits||0) < 1) return false;
   stats.credits -= 1;
+  // strip angle brackets: names get rendered via innerHTML in the roster/showcase
+  const cleanName = (name||'').trim().replace(/[<>]/g,'').slice(0,20);
   const d = {
-    id: uid(), owner, name: (name||'').trim() || 'Mystery Egg',
+    id: uid(), owner, name: cleanName || 'Mystery Egg',
     species: pick(SPECIES), colorIdx: Math.floor(Math.random()*COLORS.length), rarity: rollRarity(),
     stage:'egg', hatchAt: Date.now()+settings.hatchSecs*1000,
     health:100, happiness:70, lastInteraction: Date.now(), lastProgressAt:0,
     closet:[], equipped:[]
   };
   stats.dinos.push(d);
-  if(!stats.activeDinoId) stats.activeDinoId = d.id;
+  stats.activeDinoId = d.id; // the egg you just named takes the screen — SELECT cycles back anytime
   maybeUpgradeBestRarity(stats, d.rarity.key);
   if((RARITY_META[d.rarity.key]||{}).foil) stats.rareDinoCount = (stats.rareDinoCount||0)+1;
   showToast(`🥚 ${owner} spent a Credit on a new egg — naming it "${d.name}"!`);
@@ -849,6 +867,10 @@ let current = null;
 let currentOwnerHandle = null; // set on any successful search, even before an active dino exists
 let closetOpen = false;
 let dancingUntil = 0;
+/* The 1-second refresh must never rebuild tappable DOM that hasn't changed — replacing a
+   button mid-tap eats the click (worst on touch screens). These signatures gate rebuilds. */
+let lastActionsSig = null;
+let lastClosetSig = null;
 
 /* ============================ N64-STYLE 3D SPRITE ============================
    A small persistent WebGL scene lives inside the device screen. Deliberately low
@@ -1271,6 +1293,7 @@ function renderPlayerScreen(){
     document.getElementById('equippedRow').style.display = 'none';
     document.getElementById('pRarity').style.display = 'none';
     document.getElementById('pMeta').style.display = 'none';
+    document.getElementById('evolveHint').style.display = 'none';
     document.getElementById('pSub').textContent = `@${d.owner}`;
     const eggRank = rankFor(stats.totalDays);
     const pRankEgg = document.getElementById('pRank');
@@ -1303,8 +1326,23 @@ function renderPlayerScreen(){
   const pMeta = document.getElementById('pMeta');
   pMeta.style.display = '';
   const cooldownLeft = Math.max(0, MIN_STAGE_GAP_MS - (Date.now()-(d.lastProgressAt||0)));
-  const readyNote = cooldownLeft>0 ? ` · next level-up ready in ${Math.ceil(cooldownLeft/1000)}s` : (isMaxed ? '' : ' · ready to evolve!');
+  const readyNote = (!isMaxed && cooldownLeft>0) ? ` · next level-up in ${Math.ceil(cooldownLeft/1000)}s` : '';
   pMeta.textContent = `${STAGE_LABEL[d.stage]}${isMaxed ? ' (fully grown)' : ''}${isMaxed ? ` · 🎁 ${(d.closet||[]).length}/${ITEM_POOL.length}` : readyNote}`;
+
+  /* The evolve prompt must be honest about the economy: being "ready" doesn't mean free —
+     no Credit means the path is gift → Credit → evolve, and we say so right on the screen. */
+  const evolveHint = document.getElementById('evolveHint');
+  if(cooldownLeft<=0 && !isMaxed){
+    evolveHint.style.display = '';
+    evolveHint.textContent = (stats.credits||0) > 0
+      ? '⬆ READY TO EVOLVE — tap the 🌌 alert!'
+      : '⬆ READY TO EVOLVE — gift a Galaxy or 1,000 Bits to earn a Credit!';
+  } else if(cooldownLeft<=0 && isMaxed && (stats.credits||0) > 0){
+    evolveHint.style.display = '';
+    evolveHint.textContent = '🎁 Tap the 🌌 alert for a surprise item!';
+  } else {
+    evolveHint.style.display = 'none';
+  }
   const rank = rankFor(stats.totalDays);
   const pRank = document.getElementById('pRank');
   pRank.style.display = '';
@@ -1314,13 +1352,17 @@ function renderPlayerScreen(){
 
   const actionsNow = STAGE_ACTIONS[d.stage] || [];
   actions.style.display = 'grid';
-  actions.innerHTML = actionsNow.map(key=>{
-    const def = ACTION_DEFS[key];
-    const isSleepBtn = key==='sleep';
-    const label = isSleepBtn ? (d.sleeping ? '☀️ Wake' : '😴 Sleep') : `${def.icon} ${def.label}`;
-    const activeClass = (isSleepBtn && d.sleeping) ? ' sleep-active' : '';
-    return `<button id="actBtn_${key}" class="${activeClass}" data-action="${key}">${label}</button>`;
-  }).join('') + `<button data-action="closet">👕 Closet${closetOpen?' ▾':' ▸'}</button>`;
+  const actionsSig = `${d.id}|${d.stage}|${d.sleeping?1:0}|${closetOpen?1:0}`;
+  if(actionsSig !== lastActionsSig){
+    lastActionsSig = actionsSig;
+    actions.innerHTML = actionsNow.map(key=>{
+      const def = ACTION_DEFS[key];
+      const isSleepBtn = key==='sleep';
+      const label = isSleepBtn ? (d.sleeping ? '☀️ Wake' : '😴 Sleep') : `${def.icon} ${def.label}`;
+      const activeClass = (isSleepBtn && d.sleeping) ? ' sleep-active' : '';
+      return `<button id="actBtn_${key}" class="${activeClass}" data-action="${key}">${label}</button>`;
+    }).join('') + `<button data-action="closet">👕 Closet${closetOpen?' ▾':' ▸'}</button>`;
+  }
   renderCloset();
   updateCooldownUI();
 }
@@ -1328,11 +1370,14 @@ function renderPlayerScreen(){
 function renderCloset(){
   const closet = document.getElementById('closet');
   const inner = document.getElementById('closetInner');
-  if(!closetOpen || !current || current.stage==='egg'){ closet.classList.remove('show'); return; }
+  if(!closetOpen || !current || current.stage==='egg'){ closet.classList.remove('show'); lastClosetSig = null; return; }
   closet.classList.add('show');
   const owned = current.closet || [];
-  if(!owned.length){ inner.innerHTML = `<div class="closet-empty">No items yet — once ${current.name} is fully grown, extra Credits spent on it unlock items it keeps forever!</div>`; return; }
   const equipped = current.equipped || [];
+  const closetSig = `${current.id}|${owned.join(',')}|${equipped.join(',')}`;
+  if(closetSig === lastClosetSig) return; // nothing changed — don't touch tappable DOM
+  lastClosetSig = closetSig;
+  if(!owned.length){ inner.innerHTML = `<div class="closet-empty">No items yet — once ${current.name} is fully grown, extra Credits spent on it unlock items it keeps forever!</div>`; return; }
   inner.innerHTML = `<div class="closet-grid">${owned.map(id=>{
     const it = ITEM_BY_ID[id]; if(!it) return '';
     const isEq = equipped.includes(id);
@@ -1390,6 +1435,20 @@ function cycleActiveDino(){
   renderPlayerScreen();
 }
 document.getElementById('selectBtn').addEventListener('click', cycleActiveDino);
+
+/* Sound self-test: force-unlocks audio in a guaranteed gesture, then reports honestly.
+   If sounds are silent on someone's device, this button answers "is it us or the browser?" */
+document.getElementById('soundBtn').addEventListener('click', ()=>{
+  kickAudio();
+  setTimeout(()=>{
+    if(audioCtx && audioCtx.state === 'running'){
+      playPetChime();
+      showToast('🔊 Sound is on!');
+    } else {
+      showToast('🔇 Your browser is blocking audio — try opening this page directly in Chrome or Safari.');
+    }
+  }, 150);
+});
 
 /* ============================ STREAK MILESTONE CELEBRATION ============================ */
 const MILESTONE_TITLES = { 7:'ONE FULL WEEK!', 30:'A WHOLE MONTH!', 100:'CENTURY CLUB!' };
@@ -1470,12 +1529,45 @@ document.getElementById('copyShowcaseLink').addEventListener('click', async ()=>
 });
 
 /* ============================ SPEND A CREDIT ============================ */
+let spendNamingEgg = false; // true while the "name your new egg" form is showing
 function renderSpendModal(){
   const stats = getOwnerStats(currentOwnerHandle);
-  document.getElementById('spendCreditCount').textContent = `You have ${stats.credits} Credit${stats.credits===1?'':'s'}. Choose what to spend one on:`;
+  const subtitle = document.getElementById('spendCreditCount');
   const list = document.getElementById('spendList');
+
+  if(spendNamingEgg){
+    subtitle.textContent = 'Name your new dino — pick something good, it sticks forever!';
+    list.innerHTML = `<div class="egg-name-form">
+      <input id="eggNameInput" maxlength="20" placeholder="e.g. Bitey, Rex, Sir Stomps…" autocomplete="off">
+      <button id="confirmEggBtn" style="width:100%; margin-top:10px;">🥚 Claim my egg! (1 🌌)</button>
+      <button class="secondary" id="cancelEggBtn" style="width:100%; margin-top:6px;">← Back</button>
+    </div>`;
+    const input = document.getElementById('eggNameInput');
+    const confirmClaim = async ()=>{
+      if(spendOnNewEgg(currentOwnerHandle, input.value)){
+        spendNamingEgg = false;
+        current = getActiveDino(currentOwnerHandle);
+        await save();
+        renderPlayerScreen();
+        if(getOwnerStats(currentOwnerHandle).credits <= 0) document.getElementById('spendOverlay').style.display='none';
+        else renderSpendModal();
+      } else {
+        // the Credit disappeared (e.g. spent from another device) — back to the menu
+        showToast('⚠️ No Credit available!');
+        spendNamingEgg = false;
+        renderSpendModal();
+      }
+    };
+    document.getElementById('confirmEggBtn').addEventListener('click', confirmClaim);
+    document.getElementById('cancelEggBtn').addEventListener('click', ()=>{ spendNamingEgg = false; renderSpendModal(); });
+    input.addEventListener('keydown', e=>{ if(e.key==='Enter') confirmClaim(); });
+    input.focus();
+    return;
+  }
+
+  subtitle.textContent = `You have ${stats.credits} Credit${stats.credits===1?'':'s'}. Choose what to spend one on:`;
   const maxStage = STAGE_ORDER[STAGE_ORDER.length-1];
-  let rows = `<div class="lb-row" data-action="egg" style="cursor:pointer"><span class="lb-rank">🥚</span><span class="lb-name">New egg — a fresh surprise dino</span><span class="lb-val">1 🌌</span></div>`;
+  let rows = `<div class="lb-row" data-action="egg" style="cursor:pointer"><span class="lb-rank">🥚</span><span class="lb-name">New egg — name & claim a surprise dino</span><span class="lb-val">1 🌌</span></div>`;
   stats.dinos.forEach(d=>{
     const st = effectiveStage(d);
     if(st==='egg') return;
@@ -1495,9 +1587,9 @@ function renderSpendModal(){
   list.querySelectorAll('[data-action]').forEach(row=>{
     row.addEventListener('click', async ()=>{
       const action = row.dataset.action, id = row.dataset.id;
+      if(action==='egg'){ spendNamingEgg = true; renderSpendModal(); return; } // no spend yet — name it first
       let ok = false;
-      if(action==='egg') ok = spendOnNewEgg(currentOwnerHandle, '');
-      else if(action==='evolve') ok = spendOnEvolve(currentOwnerHandle, id);
+      if(action==='evolve') ok = spendOnEvolve(currentOwnerHandle, id);
       else if(action==='item') ok = spendOnItem(currentOwnerHandle, id);
       if(ok){
         current = getActiveDino(currentOwnerHandle);
@@ -1510,10 +1602,11 @@ function renderSpendModal(){
   });
 }
 document.getElementById('creditAlert').addEventListener('click', ()=>{
+  spendNamingEgg = false; // always land on the menu, not a stale name form
   document.getElementById('spendOverlay').style.display = 'flex';
   renderSpendModal();
 });
-document.getElementById('closeSpend').addEventListener('click', ()=>{ document.getElementById('spendOverlay').style.display = 'none'; });
+document.getElementById('closeSpend').addEventListener('click', ()=>{ spendNamingEgg = false; document.getElementById('spendOverlay').style.display = 'none'; });
 
 
 
@@ -1537,24 +1630,42 @@ function popSpeech(text){
    fine here since every sound is triggered from a button click. */
 let audioCtx = null;
 function ensureAudio(){
-  if(!audioCtx){
+  try{
     const AC = window.AudioContext || window.webkitAudioContext;
     if(!AC) return null;
-    audioCtx = new AC();
-  }
-  if(audioCtx.state === 'suspended') audioCtx.resume();
-  return audioCtx;
+    if(!audioCtx || audioCtx.state === 'closed') audioCtx = new AC();
+    if(audioCtx.state === 'suspended') audioCtx.resume().catch(()=>{});
+    return audioCtx;
+  }catch(e){ return null; }
 }
+/* Browsers keep audio locked until a real user gesture. If the first sound attempt is
+   render-driven (a Credit ding pushed by Firebase, a page opened via a shared ?u= link),
+   the context is born suspended and stays silent. These one-time listeners unlock on the
+   very first tap/keypress anywhere, and the one-sample silent "kick" is the classic trick
+   that wakes stubborn WebKit/iOS contexts created before any gesture existed. */
+function kickAudio(){
+  const ctx = ensureAudio();
+  if(!ctx) return;
+  try{
+    const buf = ctx.createBuffer(1, 1, 22050);
+    const src = ctx.createBufferSource();
+    src.buffer = buf; src.connect(ctx.destination); src.start(0);
+  }catch(e){}
+}
+['pointerdown','touchend','keydown'].forEach(evt=>
+  document.addEventListener(evt, kickAudio, { once:true, passive:true }));
 function playTone(freq, dur, type, startTime, volume){
   const ctx = ensureAudio(); if(!ctx) return;
-  const now = ctx.currentTime + (startTime||0);
-  const osc = ctx.createOscillator(); const gain = ctx.createGain();
-  osc.type = type||'square';
-  osc.frequency.setValueAtTime(freq, now);
-  gain.gain.setValueAtTime(Math.max(0.0001,volume||0.15), now);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now+dur);
-  osc.connect(gain); gain.connect(ctx.destination);
-  osc.start(now); osc.stop(now+dur+0.02);
+  try{
+    const now = ctx.currentTime + (startTime||0);
+    const osc = ctx.createOscillator(); const gain = ctx.createGain();
+    osc.type = type||'square';
+    osc.frequency.setValueAtTime(freq, now);
+    gain.gain.setValueAtTime(Math.max(0.0001,volume||0.15), now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now+dur);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(now); osc.stop(now+dur+0.02);
+  }catch(e){}
 }
 const ROAR_PARAMS = {
   rex:    { start:180, end:70,  dur:0.55, type:'sawtooth' },
@@ -1692,6 +1803,18 @@ function playMilestoneFanfare(){
   chord2.forEach(f=> playTone(f, 0.22, 'square', 0.2, 0.13));
   chord3.forEach(f=> playTone(f, 0.5, 'triangle', 0.4, 0.13));
 }
+/* One shield over every sound that builds its own oscillator graph: an audio exception
+   must never abort the interaction that triggered it (state change, fx, save all follow
+   the sound call in doInteraction). playTone-based sounds are already covered inside playTone. */
+{
+  const shield = fn => (...args)=>{ try{ fn(...args); }catch(e){} };
+  playRoar = shield(playRoar);
+  playSnore = shield(playSnore);
+  playChomp = shield(playChomp);
+  playNoiseBurst = shield(playNoiseBurst);
+  playFetch = shield(playFetch);
+  playPracticeRoar = shield(playPracticeRoar);
+}
 
 async function doInteraction(kind){
   if(!current || current.stage==='egg') return;
@@ -1765,7 +1888,7 @@ async function doInteraction(kind){
 document.getElementById('actions').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-action]');
   if(!btn || btn.disabled) return;
-  ensureAudio(); // a real user gesture — unlocks the AudioContext for later render-driven sounds
+  kickAudio(); // a real user gesture — fully unlocks the AudioContext for this and later sounds
   if(btn.dataset.action === 'closet'){ closetOpen = !closetOpen; renderPlayerScreen(); return; }
   doInteraction(btn.dataset.action);
 });
@@ -1773,7 +1896,7 @@ document.getElementById('actions').addEventListener('click', (e)=>{
 async function doSearch(){
   const handle = document.getElementById('searchInput').value;
   if(!handle.trim()) return;
-  ensureAudio(); // searching is a user gesture — unlock audio now so alert/milestone sounds can play
+  kickAudio(); // searching is a user gesture — fully unlock audio now
   const h = normalize(handle);
   closetOpen = false;
   if(!ownerStats[h]){
