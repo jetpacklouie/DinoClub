@@ -126,16 +126,6 @@
   .ms-confetti span{ position:absolute; top:-30px; font-size:22px; animation:msFall linear infinite; }
   @keyframes msFall{ to{ transform:translateY(110vh) rotate(540deg); } }
 
-  /* ---- Shareable showcase ---- */
-  .sc-head{ text-align:center; margin-bottom:12px; }
-  .sc-handle{ font-family:'Fredoka'; font-weight:700; font-size:21px; color:var(--cream); }
-  .sc-rank{ font-size:13px; color:var(--amber); margin-top:3px; }
-  .sc-stats{ display:flex; justify-content:center; gap:14px; font-size:11.5px; color:var(--dim); margin-top:6px; flex-wrap:wrap; }
-  .sc-dino{ display:flex; align-items:center; gap:10px; background:rgba(255,255,255,.05); border-radius:12px; padding:9px 12px; margin-top:7px; }
-  .sc-swatch{ width:14px; height:14px; border-radius:5px; flex-shrink:0; border:1px solid rgba(255,255,255,.25); }
-  .sc-dino .n{ font-family:'Fredoka'; font-weight:600; font-size:13.5px; color:var(--cream); }
-  .sc-dino .d{ font-size:10.5px; color:var(--dim); }
-  .sc-dino .r{ margin-left:auto; flex-shrink:0; }
   .device{ background:linear-gradient(150deg, var(--shell) 0%, #a4c190 45%, var(--shell-2) 100%); border-radius:42px; padding:20px 22px 26px;
     box-shadow:0 18px 40px rgba(0,0,0,.5), inset 0 2px 0 rgba(255,255,255,.5); position:relative; overflow:hidden; }
   .dino-print{ position:absolute; width:92px; height:92px; opacity:.28; fill:#6f8a5c; top:46%; pointer-events:none; }
@@ -216,8 +206,12 @@
   tbody td{ padding:8px; border-bottom:1px solid var(--line); vertical-align:middle; }
   .swatch{ width:12px; height:12px; border-radius:50%; display:inline-block; margin-right:6px; vertical-align:middle; }
   .rarity-badge{ font-size:11px; font-weight:800; padding:2px 7px; border-radius:20px; display:inline-block; }
-  .r-common{ background:#3a4842; color:#c7cfc9; } .r-uncommon{ background:#1e4a30; color:#8fe0a8; }
-  .r-rareholo{ background:#1e3b52; color:#7ec8f2; } .r-ultra{ background:#4a3a12; color:#ffe08a; } .r-secret{ background:#4a1f18; color:#ffb199; }
+  .r-common{ background:#2c3a33; color:#aebdb3; border:1px solid #aebdb3; }
+  .r-uncommon{ background:#12351f; color:#4cd964; border:1px solid #4cd964; }
+  .r-rareholo{ background:#0f2b44; color:#4aa8ff; border:1px solid #4aa8ff; box-shadow:0 0 8px rgba(74,168,255,.4); }
+  .r-ultra{ background:#3a2a05; color:#ffb020; border:1px solid #ffb020; box-shadow:0 0 8px rgba(255,176,32,.45); }
+  .r-secret{ background:#2d0f33; color:#e254ff; border:1px solid #e254ff; box-shadow:0 0 10px rgba(226,84,255,.55); animation:secretShift 2.6s linear infinite; }
+  @keyframes secretShift{ from{ filter:hue-rotate(0deg); } to{ filter:hue-rotate(360deg); } }
   .mini-bar{ width:64px; height:7px; background:#0a1a15; border-radius:4px; overflow:hidden; display:inline-block; vertical-align:middle; }
   .mini-fill{ height:100%; } .mini-fill.health{ background:var(--health); } .mini-fill.bond{ background:var(--bond); }
   .egg-tag{ font-size:11px; color:var(--dim); }
@@ -456,8 +450,9 @@
 
 <div class="gate-overlay" id="showcaseOverlay" style="display:none">
   <div class="lb-card">
+    <h3 style="text-align:center;">📸 My Collection Card</h3>
     <div id="showcaseContent"></div>
-    <button id="copyShowcaseLink" style="width:100%; margin-top:10px;">🔗 Copy Share Link</button>
+    <button id="shareCardBtn" style="width:100%; margin-top:10px;" disabled>📤 Share Image</button>
     <button class="secondary" id="closeShowcase" style="width:100%; margin-top:8px;">Close</button>
   </div>
 </div>
@@ -508,11 +503,11 @@ const SPECIES_NAMES = { rex:'T-Rex', tri:'Triceratops', raptor:'Raptor', steggo:
 const SPECIES = Object.keys(SPECIES_NAMES);
 const RARITY_TABLE = [['Common','common',0.55],['Uncommon','uncommon',0.24],['Rare Holo','rareholo',0.13],['Ultra Rare','ultra',0.065],['Secret Rare','secret',0.015]];
 const RARITY_META = {
-  common:   { label:'Common',      symbol:'●',  cls:'r-common' },
-  uncommon: { label:'Uncommon',    symbol:'◆',  cls:'r-uncommon' },
-  rareholo: { label:'Rare Holo',   symbol:'★',  cls:'r-rareholo' },
-  ultra:    { label:'Ultra Rare',  symbol:'✦✦', cls:'r-ultra' },
-  secret:   { label:'Secret Rare', symbol:'🔥', cls:'r-secret' },
+  common:   { label:'Common',      symbol:'●',  cls:'r-common',   color:'#aebdb3' },
+  uncommon: { label:'Uncommon',    symbol:'◆',  cls:'r-uncommon', color:'#4cd964' },
+  rareholo: { label:'Rare Holo',   symbol:'★',  cls:'r-rareholo', color:'#4aa8ff', foil:true },
+  ultra:    { label:'Ultra Rare',  symbol:'✦✦', cls:'r-ultra',    color:'#ffb020', foil:true },
+  secret:   { label:'Secret Rare', symbol:'🔥', cls:'r-secret',   color:'#e254ff', foil:true },
 };
 const COLORS = ['#5fb85f','#3aa1c9','#c96ba8','#e88a3a','#8a6fe0','#d94f4f','#4fd9a6','#b8b23a','#e8e8e8','#9a7a4a'];
 const STAGE_ORDER = ['egg','hatchling','juvenile','adult'];
@@ -1323,6 +1318,7 @@ function renderPlayerScreen(){
   document.getElementById('pSub').textContent = `@${d.owner} · ${SPECIES_NAMES[d.species]}`;
   const pRarity = document.getElementById('pRarity');
   pRarity.style.display = ''; pRarity.textContent = `${meta.symbol} ${meta.label}`;
+  pRarity.style.color = meta.color; pRarity.style.textShadow = '0 0 3px rgba(0,0,0,.35)';
   const pMeta = document.getElementById('pMeta');
   pMeta.style.display = '';
   const cooldownLeft = Math.max(0, MIN_STAGE_GAP_MS - (Date.now()-(d.lastProgressAt||0)));
@@ -1479,53 +1475,213 @@ function hideMilestoneCelebration(){
 }
 document.getElementById('milestoneOverlay').addEventListener('click', hideMilestoneCelebration);
 
-/* ============================ SHAREABLE SHOWCASE ============================ */
-function renderShowcase(){
-  const stats = getOwnerStats(currentOwnerHandle);
+/* ============================ SHAREABLE SHOWCASE (image card) ============================
+   A link asks people to click; an image IS the flex. This renders a 1080×1080 PNG —
+   their star dino captured straight from the 3D renderer, stats and rank below —
+   shared via the native share sheet on mobile, downloaded on desktop. */
+function pickBestDino(stats){
+  const rOrder = RARITY_TABLE.map(r=>r[1]);
+  return stats.dinos.slice().sort((a,b)=>{
+    const s = STAGE_ORDER.indexOf(effectiveStage(b)) - STAGE_ORDER.indexOf(effectiveStage(a));
+    if(s) return s;
+    const r = rOrder.indexOf(b.rarity.key) - rOrder.indexOf(a.rarity.key);
+    if(r) return r;
+    return (b.closet||[]).length - (a.closet||[]).length;
+  })[0];
+}
+/* Borrows the live WebGL renderer for one frame at high resolution, then puts everything
+   back before the next paint — the LCD never visibly flickers. */
+function captureDinoImage(d){
+  try{
+    renderer3d.setSize(480, 480, false);
+    updateSprite3D(d);
+    renderer3d.render(scene3d, camera3d);
+    const url = renderer3d.domElement.toDataURL('image/png');
+    updateSprite3D(current);
+    renderer3d.setSize(96, 96, false);
+    renderer3d.render(scene3d, camera3d);
+    return url;
+  }catch(e){
+    try{ updateSprite3D(current); renderer3d.setSize(96, 96, false); }catch(e2){}
+    return null;
+  }
+}
+function rrPath(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  if(ctx.roundRect){ ctx.roundRect(x, y, w, h, r); return; }
+  ctx.moveTo(x+r, y);
+  ctx.arcTo(x+w, y,   x+w, y+h, r);
+  ctx.arcTo(x+w, y+h, x,   y+h, r);
+  ctx.arcTo(x,   y+h, x,   y,   r);
+  ctx.arcTo(x,   y,   x+w, y,   r);
+  ctx.closePath();
+}
+async function buildShareCard(stats){
+  try{
+    await Promise.all([
+      document.fonts.load('700 72px Fredoka'), document.fonts.load('600 34px Fredoka'),
+      document.fonts.load('50px VT323'), document.fonts.load('600 24px Nunito'),
+    ]);
+    await document.fonts.ready;
+  }catch(e){ /* fallback fonts are fine */ }
+
+  const best = pickBestDino(stats);
+  const bestMeta = RARITY_META[best.rarity.key] || RARITY_META.common;
+  const heroUrl = captureDinoImage(best);
+  const heroImg = heroUrl ? await new Promise(res=>{
+    const im = new Image(); im.onload = ()=>res(im); im.onerror = ()=>res(null); im.src = heroUrl;
+  }) : null;
+
+  const c = document.createElement('canvas'); c.width = 1080; c.height = 1080;
+  const ctx = c.getContext('2d');
+
+  // background + gold frame
+  const bg = ctx.createLinearGradient(0, 0, 0, 1080);
+  bg.addColorStop(0, '#122a1e'); bg.addColorStop(1, '#0b1c13');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, 1080, 1080);
+  ctx.lineWidth = 5; ctx.strokeStyle = '#f2b134';
+  rrPath(ctx, 24, 24, 1032, 1032, 38); ctx.stroke();
+  ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(242,177,52,.35)';
+  rrPath(ctx, 36, 36, 1008, 1008, 30); ctx.stroke();
+
+  // header
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#f2b134'; ctx.font = '700 46px Fredoka';
+  ctx.fillText('🦖 DINO CLUB', 540, 106);
+  ctx.fillStyle = '#f4efe6';
+  let handleSize = 72;
+  ctx.font = `700 ${handleSize}px Fredoka`;
+  while(ctx.measureText('@'+currentOwnerHandle).width > 920 && handleSize > 34){
+    handleSize -= 4; ctx.font = `700 ${handleSize}px Fredoka`;
+  }
+  ctx.fillText('@'+currentOwnerHandle, 540, 182);
   const rank = rankFor(stats.totalDays);
-  const itemTotal = stats.dinos.reduce((s,d)=> s+(d.closet||[]).length, 0);
-  const dinoRows = stats.dinos.map(d=>{
-    const meta = RARITY_META[d.rarity.key] || RARITY_META.common;
-    const st = effectiveStage(d);
-    const items = (d.closet||[]).length;
-    return `<div class="sc-dino">
-      <span class="sc-swatch" style="background:${COLORS[d.colorIdx]||'#5fb85f'}"></span>
-      <div><div class="n">${d.name}</div><div class="d">${SPECIES_NAMES[d.species]} · ${STAGE_LABEL[st]||st}${items?` · 🎁 ${items}`:''}</div></div>
-      <span class="r rarity-badge ${meta.cls}">${meta.symbol} ${meta.label}</span>
-    </div>`;
-  }).join('');
-  document.getElementById('showcaseContent').innerHTML = `
-    <div class="sc-head">
-      <div class="sc-handle">@${currentOwnerHandle}'s Dino Club</div>
-      <div class="sc-rank">${rank.icon} ${rank.title}</div>
-      <div class="sc-stats">
-        <span>🔥 ${stats.currentStreak||0}d streak (best ${stats.longestStreak||0})</span>
-        <span>🌌 ${stats.totalGalaxiesAllTime||0} given</span>
-        <span>🎁 ${itemTotal} items</span>
-      </div>
-    </div>
-    ${dinoRows || '<div class="lb-empty">No dinos yet!</div>'}`;
+  const score = computeOverallScore(stats);
+  ctx.fillStyle = '#f2b134'; ctx.font = '600 32px Fredoka';
+  ctx.fillText(`${rank.icon} ${rank.title}  ·  🏆 ${score} pts`, 540, 232);
+
+  // hero panel with rarity-colored glow
+  const px = 230, py = 262, pw = 620, ph = 470;
+  ctx.save();
+  ctx.shadowColor = bestMeta.color; ctx.shadowBlur = 65;
+  const lcd = ctx.createLinearGradient(0, py, 0, py+ph);
+  lcd.addColorStop(0, '#94ae7d'); lcd.addColorStop(1, '#7f9764');
+  ctx.fillStyle = lcd; rrPath(ctx, px, py, pw, ph, 24); ctx.fill();
+  ctx.restore();
+  ctx.lineWidth = 6; ctx.strokeStyle = '#132110';
+  rrPath(ctx, px, py, pw, ph, 24); ctx.stroke();
+
+  ctx.fillStyle = '#16240d'; ctx.font = '26px VT323';
+  ctx.fillText('⭐ STAR DINO ⭐', 540, py + 36);
+  if(heroImg){
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(heroImg, 540-180, py + 46, 360, 360);
+  } else {
+    ctx.font = '200px serif';
+    ctx.fillText('🦖', 540, py + 290);
+  }
+  let nameSize = 50;
+  ctx.font = `${nameSize}px VT323`;
+  while(ctx.measureText(best.name).width > 560 && nameSize > 24){ nameSize -= 2; ctx.font = `${nameSize}px VT323`; }
+  ctx.fillStyle = '#16240d';
+  ctx.fillText(best.name, 540, py + 428);
+  ctx.font = '26px VT323';
+  ctx.fillText(`${SPECIES_NAMES[best.species]} · ${STAGE_LABEL[effectiveStage(best)]}`, 540, py + 458);
+
+  // rarity pill, straddling the panel's bottom edge in the tier's color
+  ctx.font = '700 28px Fredoka';
+  const pillText = `${bestMeta.symbol} ${bestMeta.label.toUpperCase()}`;
+  const pillW = ctx.measureText(pillText).width + 56;
+  const pillY = py + ph - 24, pillH = 50;
+  if(best.rarity.key === 'secret'){
+    const rainbow = ctx.createLinearGradient(540-pillW/2, 0, 540+pillW/2, 0);
+    ['#ff4d4d','#ffb020','#ffe74d','#4cd964','#4aa8ff','#e254ff'].forEach((col,i,arr)=> rainbow.addColorStop(i/(arr.length-1), col));
+    ctx.fillStyle = rainbow;
+  } else {
+    ctx.fillStyle = bestMeta.color;
+  }
+  ctx.save();
+  ctx.shadowColor = bestMeta.color; ctx.shadowBlur = 22;
+  rrPath(ctx, 540-pillW/2, pillY, pillW, pillH, 25); ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = '#1c1006';
+  ctx.fillText(pillText, 540, pillY + 35);
+
+  // stats grid — 2 × 3 chips
+  const items = stats.dinos.reduce((s,d)=> s+(d.closet||[]).length, 0);
+  const bestR = RARITY_META[stats.bestRarityKey] || RARITY_META.common;
+  const chips = [
+    ['🔥', `${stats.currentStreak||0}d`, `streak · best ${stats.longestStreak||0}d`, '#f4efe6'],
+    ['🌌', `${stats.totalGalaxiesAllTime||0}`, 'Galaxies given', '#f4efe6'],
+    ['🦖', `${stats.dinos.length}`, 'dinos owned', '#f4efe6'],
+    ['🎁', `${items}`, 'items collected', '#f4efe6'],
+    ['📅', `${stats.totalDays||0}`, 'days played', '#f4efe6'],
+    ['💎', bestR.label, 'rarest pull', bestR.color],
+  ];
+  const chipW = 470, chipH = 58, gx = 30, gy = 15;
+  const gridX = (1080 - chipW*2 - gx)/2, gridY = 812;
+  chips.forEach((chip, i)=>{
+    const cx = gridX + (i%2)*(chipW+gx), cy = gridY + Math.floor(i/2)*(chipH+gy);
+    ctx.fillStyle = 'rgba(255,255,255,.065)';
+    rrPath(ctx, cx, cy, chipW, chipH, 14); ctx.fill();
+    ctx.textAlign = 'left';
+    ctx.fillStyle = chip[3]; ctx.font = '700 30px Fredoka';
+    ctx.fillText(`${chip[0]} ${chip[1]}`, cx + 18, cy + 39);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#9db3a4'; ctx.font = '600 20px Nunito';
+    ctx.fillText(chip[2], cx + chipW - 18, cy + 37);
+    ctx.textAlign = 'center';
+  });
+
+  // footer CTA — built from wherever this page is actually hosted
+  ctx.fillStyle = '#9db3a4'; ctx.font = '600 24px Nunito';
+  const clubUrl = location.host + location.pathname.replace(/index\.html$/,'');
+  ctx.fillText(`Join the club ➜ ${clubUrl}`, 540, 1044);
+
+  return c;
+}
+
+let shareCardBlob = null;
+async function renderShowcase(){
+  const wrap = document.getElementById('showcaseContent');
+  const btn = document.getElementById('shareCardBtn');
+  wrap.innerHTML = `<div class="lb-empty">🎨 Building your card…</div>`;
+  btn.disabled = true;
+  try{
+    const stats = getOwnerStats(currentOwnerHandle);
+    const canvas = await buildShareCard(stats);
+    shareCardBlob = await new Promise(res=> canvas.toBlob(res, 'image/png'));
+    if(!shareCardBlob) throw new Error('toBlob failed');
+    wrap.innerHTML = `<img id="shareCardImg" alt="Dino Club collection card" style="width:100%; display:block; border-radius:14px;">`;
+    document.getElementById('shareCardImg').src = canvas.toDataURL('image/png');
+    const testFile = new File([shareCardBlob], 'dino-club.png', { type:'image/png' });
+    const canNativeShare = !!(navigator.canShare && navigator.canShare({ files:[testFile] }));
+    btn.textContent = canNativeShare ? '📤 Share Image' : '⬇️ Download Image';
+    btn.disabled = false;
+  }catch(e){
+    wrap.innerHTML = `<div class="lb-empty">Couldn't build the card on this device 😕 — try again or use another browser.</div>`;
+  }
 }
 document.getElementById('openShowcase').addEventListener('click', ()=>{
   document.getElementById('showcaseOverlay').style.display = 'flex';
   renderShowcase();
 });
 document.getElementById('closeShowcase').addEventListener('click', ()=>{ document.getElementById('showcaseOverlay').style.display = 'none'; });
-document.getElementById('copyShowcaseLink').addEventListener('click', async ()=>{
-  const link = location.origin + location.pathname + '?u=' + encodeURIComponent(currentOwnerHandle);
-  let copied = false;
-  try{ await navigator.clipboard.writeText(link); copied = true; }
-  catch(e){
-    // clipboard API needs a secure context + permission; fall back to the old trick
+document.getElementById('shareCardBtn').addEventListener('click', async ()=>{
+  if(!shareCardBlob) return;
+  const file = new File([shareCardBlob], `dino-club-${currentOwnerHandle}.png`, { type:'image/png' });
+  if(navigator.canShare && navigator.canShare({ files:[file] })){
     try{
-      const ta = document.createElement('textarea');
-      ta.value = link; ta.style.position='fixed'; ta.style.opacity='0';
-      document.body.appendChild(ta); ta.select();
-      copied = document.execCommand('copy');
-      document.body.removeChild(ta);
-    }catch(e2){ copied = false; }
+      await navigator.share({ files:[file], title:'My Dino Club collection' });
+    }catch(e){ /* user closed the share sheet — that's fine */ }
+  } else {
+    const url = URL.createObjectURL(shareCardBlob);
+    const a = document.createElement('a');
+    a.href = url; a.download = file.name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=> URL.revokeObjectURL(url), 4000);
+    showToast('⬇️ Image saved — post it anywhere!');
   }
-  showToast(copied ? '🔗 Link copied — paste it anywhere!' : link);
 });
 
 /* ============================ SPEND A CREDIT ============================ */
