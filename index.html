@@ -525,31 +525,37 @@ const COLORS = ['#5fb85f','#3aa1c9','#c96ba8','#e88a3a','#8a6fe0','#d94f4f','#4f
 const STAGE_ORDER = ['egg','hatchling','juvenile','adult'];
 const STAGE_LABEL = { egg:'Egg', hatchling:'Hatchling', juvenile:'Juvenile', adult:'Adult' };
 const ITEM_POOL = [
-  {id:'tophat', name:'Top Hat', emoji:'🎩'}, {id:'crown', name:'Tiny Crown', emoji:'👑'},
-  {id:'sunglasses', name:'Cool Shades', emoji:'🕶️'}, {id:'cap', name:'Backwards Cap', emoji:'🧢'},
-  {id:'sunhat', name:'Sun Hat', emoji:'👒'}, {id:'scarf', name:'Cozy Scarf', emoji:'🧣'},
-  {id:'bowtie', name:'Bow Tie', emoji:'🎀'}, {id:'mustache', name:'Fancy Mustache', emoji:'🥸'},
-  {id:'jetpack', name:'Jetpack', emoji:'🚀'}, {id:'glitter', name:'Glitter Coating', emoji:'✨'},
-  {id:'socks', name:'Stripy Socks', emoji:'🧦'}, {id:'sneakers', name:'Sneakers', emoji:'👟'},
-  {id:'boots', name:'Rain Boots', emoji:'🥾'}, {id:'sandals', name:'Sandals', emoji:'🩴'},
-  {id:'skates', name:'Roller Skates', emoji:'🛼'}, {id:'vest', name:'Explorer Vest', emoji:'🦺'},
-  {id:'jersey', name:'Team Jersey', emoji:'🎽'}, {id:'goggles', name:'Swim Goggles', emoji:'🥽'},
-  {id:'medal', name:'Gold Medal', emoji:'🥇'}, {id:'ribbon', name:'Prize Ribbon', emoji:'🎗️'},
-  {id:'mask', name:'Party Mask', emoji:'🎭'}, {id:'flower', name:'Flower Crown', emoji:'🌸'},
-  {id:'bandana', name:'Bandana', emoji:'🏴'}, {id:'cape', name:'Hero Cape', emoji:'🦸'},
-  {id:'wizardhat', name:'Wizard Hat', emoji:'🧙'}, {id:'harmonica', name:'Harmonica', emoji:'🎼'},
-  {id:'guitar', name:'Guitar', emoji:'🎸'}, {id:'trumpet', name:'Trumpet', emoji:'🎺'},
-  {id:'violin', name:'Violin', emoji:'🎻'}, {id:'drum', name:'Little Drum', emoji:'🥁'},
-  {id:'banjo', name:'Banjo', emoji:'🪕'}, {id:'accordion', name:'Accordion', emoji:'🪗'},
-  {id:'keyboard', name:'Keyboard', emoji:'🎹'}, {id:'maracas', name:'Maracas', emoji:'🪇'},
-  {id:'horn', name:'Party Horn', emoji:'📯'}, {id:'hammer', name:'Toy Hammer', emoji:'🔨'},
-  {id:'wand', name:'Magic Wand', emoji:'🪄'}, {id:'camera', name:'Camera', emoji:'📷'},
-  {id:'paintbrush', name:'Paintbrush', emoji:'🖌️'}, {id:'palette', name:'Art Palette', emoji:'🎨'},
-  {id:'kite', name:'Kite', emoji:'🪁'}, {id:'controller', name:'Game Controller', emoji:'🎮'},
-  {id:'lollipop', name:'Giant Lollipop', emoji:'🍭'}, {id:'balloon', name:'Balloon', emoji:'🎈'},
-  {id:'sword', name:'Toy Sword', emoji:'🗡️'}, {id:'shield', name:'Little Shield', emoji:'🛡️'},
-  {id:'bow', name:'Bow & Arrow', emoji:'🏹'}, {id:'boomerang', name:'Boomerang', emoji:'🪃'},
-  {id:'slingshot', name:'Slingshot', emoji:'🪀'}, {id:'trident', name:'Tiny Trident', emoji:'🔱'},
+  // ── Common (20) — everyday wardrobe ──
+  {id:'cap', name:'Backwards Cap', emoji:'🧢', rarity:'common'}, {id:'sunhat', name:'Sun Hat', emoji:'👒', rarity:'common'},
+  {id:'scarf', name:'Cozy Scarf', emoji:'🧣', rarity:'common'}, {id:'bowtie', name:'Bow Tie', emoji:'🎀', rarity:'common'},
+  {id:'socks', name:'Stripy Socks', emoji:'🧦', rarity:'common'}, {id:'sneakers', name:'Sneakers', emoji:'👟', rarity:'common'},
+  {id:'boots', name:'Rain Boots', emoji:'🥾', rarity:'common'}, {id:'sandals', name:'Sandals', emoji:'🩴', rarity:'common'},
+  {id:'vest', name:'Explorer Vest', emoji:'🦺', rarity:'common'}, {id:'ribbon', name:'Prize Ribbon', emoji:'🎗️', rarity:'common'},
+  {id:'bandana', name:'Bandana', emoji:'🏴', rarity:'common'}, {id:'harmonica', name:'Harmonica', emoji:'🎼', rarity:'common'},
+  {id:'banjo', name:'Banjo', emoji:'🪕', rarity:'common'}, {id:'maracas', name:'Maracas', emoji:'🪇', rarity:'common'},
+  {id:'horn', name:'Party Horn', emoji:'📯', rarity:'common'}, {id:'hammer', name:'Toy Hammer', emoji:'🔨', rarity:'common'},
+  {id:'paintbrush', name:'Paintbrush', emoji:'🖌️', rarity:'common'}, {id:'kite', name:'Kite', emoji:'🪁', rarity:'common'},
+  {id:'balloon', name:'Balloon', emoji:'🎈', rarity:'common'}, {id:'slingshot', name:'Slingshot', emoji:'🪀', rarity:'common'},
+  // ── Uncommon (14) — a step up ──
+  {id:'tophat', name:'Top Hat', emoji:'🎩', rarity:'uncommon'}, {id:'mustache', name:'Fancy Mustache', emoji:'🥸', rarity:'uncommon'},
+  {id:'goggles', name:'Swim Goggles', emoji:'🥽', rarity:'uncommon'}, {id:'flower', name:'Flower Crown', emoji:'🌸', rarity:'uncommon'},
+  {id:'jersey', name:'Team Jersey', emoji:'🎽', rarity:'uncommon'}, {id:'trumpet', name:'Trumpet', emoji:'🎺', rarity:'uncommon'},
+  {id:'violin', name:'Violin', emoji:'🎻', rarity:'uncommon'}, {id:'drum', name:'Little Drum', emoji:'🥁', rarity:'uncommon'},
+  {id:'accordion', name:'Accordion', emoji:'🪗', rarity:'uncommon'}, {id:'camera', name:'Camera', emoji:'📷', rarity:'uncommon'},
+  {id:'palette', name:'Art Palette', emoji:'🎨', rarity:'uncommon'}, {id:'lollipop', name:'Giant Lollipop', emoji:'🍭', rarity:'uncommon'},
+  {id:'shield', name:'Little Shield', emoji:'🛡️', rarity:'uncommon'}, {id:'boomerang', name:'Boomerang', emoji:'🪃', rarity:'uncommon'},
+  // ── Rare Holo (9) — genuinely cool pulls ──
+  {id:'wizardhat', name:'Wizard Hat', emoji:'🧙', rarity:'rareholo'}, {id:'sunglasses', name:'Cool Shades', emoji:'🕶️', rarity:'rareholo'},
+  {id:'guitar', name:'Guitar', emoji:'🎸', rarity:'rareholo'}, {id:'controller', name:'Game Controller', emoji:'🎮', rarity:'rareholo'},
+  {id:'skates', name:'Roller Skates', emoji:'🛼', rarity:'rareholo'}, {id:'sword', name:'Toy Sword', emoji:'🗡️', rarity:'rareholo'},
+  {id:'bow', name:'Bow & Arrow', emoji:'🏹', rarity:'rareholo'}, {id:'mask', name:'Party Mask', emoji:'🎭', rarity:'rareholo'},
+  {id:'keyboard', name:'Keyboard', emoji:'🎹', rarity:'rareholo'},
+  // ── Ultra Rare (5) — the flex tier ──
+  {id:'glitter', name:'Glitter Coating', emoji:'✨', rarity:'ultra'}, {id:'wand', name:'Magic Wand', emoji:'🪄', rarity:'ultra'},
+  {id:'cape', name:'Hero Cape', emoji:'🦸', rarity:'ultra'}, {id:'medal', name:'Gold Medal', emoji:'🥇', rarity:'ultra'},
+  {id:'trident', name:'Tiny Trident', emoji:'🔱', rarity:'ultra'},
+  // ── Secret Rare (2) — the white whales ──
+  {id:'jetpack', name:'Jetpack', emoji:'🚀', rarity:'secret'}, {id:'crown', name:'Tiny Crown', emoji:'👑', rarity:'secret'},
 ];
 const ITEM_BY_ID = Object.fromEntries(ITEM_POOL.map(i=>[i.id,i]));
 /* Where each item actually sits on the dino: head-worn, face-worn, neck, body, feet, or held. */
@@ -694,6 +700,20 @@ function startFirebaseSync(){
 function uid(){ return Math.random().toString(36).slice(2,9); }
 function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 function rollRarity(){ const r=Math.random(); let acc=0; for(const [label,key,p] of RARITY_TABLE){ acc+=p; if(r<=acc) return {label,key}; } return {label:'Common',key:'common'}; }
+/* Surprise items roll a rarity tier first — the exact same odds as hatching a dino —
+   then pick a random unowned item of that tier. Tiers this dino has completed drop out
+   and the odds renormalize over what's left, so the last few pulls naturally skew rare. */
+function rollItemForDino(d){
+  const owned = d.closet || [];
+  const byTier = {};
+  ITEM_POOL.forEach(it=>{ if(!owned.includes(it.id)) (byTier[it.rarity] = byTier[it.rarity] || []).push(it); });
+  const tiers = RARITY_TABLE.filter(([,key]) => byTier[key] && byTier[key].length);
+  if(!tiers.length) return null;
+  const total = tiers.reduce((s,t)=> s + t[2], 0);
+  let r = Math.random() * total;
+  for(const [,key,p] of tiers){ r -= p; if(r <= 0) return pick(byTier[key]); }
+  return pick(byTier[tiers[tiers.length-1][1]]);
+}
 function normalize(h){ return (h||'').trim().replace(/^@/,'').toLowerCase(); }
 /* Firebase keys can't contain . # $ [ ] / — but TikTok handles often contain periods.
    All ownerStats indexing and database paths go through this; ',' can't appear in a
@@ -724,13 +744,14 @@ function applyProgressStep(d, stats){
     if(d.stage === maxStage && !stats.speciesAdult.includes(d.species)) stats.speciesAdult.push(d.species);
     if(d.stage !== prevStage) showToast(`✨ ${d.name} evolved into a ${STAGE_LABEL[d.stage]}!`);
   } else {
-    const available = ITEM_POOL.filter(it => !d.closet.includes(it.id));
-    if(available.length === 0){
+    const item = rollItemForDino(d);
+    if(!item){
       showToast(`🏆 ${d.name} already owns every item in the club — legendary collector!`);
     } else {
-      const item = pick(available);
       d.closet.push(item.id);
-      showToast(`🎁 ${d.name} unlocked ${item.emoji} ${item.name}! (${d.closet.length}/${ITEM_POOL.length})`);
+      const im = RARITY_META[item.rarity] || RARITY_META.common;
+      if(im.foil) playAbilityUnlock(); // a foil-tier item pull deserves the fanfare
+      showToast(`🎁 ${d.name} unlocked ${im.symbol} ${item.emoji} ${item.name} — ${im.label}! (${d.closet.length}/${ITEM_POOL.length})`);
     }
   }
 }
@@ -1409,7 +1430,8 @@ function renderCloset(){
   inner.innerHTML = `<div class="closet-grid">${owned.map(id=>{
     const it = ITEM_BY_ID[id]; if(!it) return '';
     const isEq = equipped.includes(id);
-    return `<div class="closet-item ${isEq?'equipped':''}" data-item="${id}">${it.emoji}<span class="iname">${it.name}</span></div>`;
+    const im = RARITY_META[it.rarity] || RARITY_META.common;
+    return `<div class="closet-item ${isEq?'equipped':''}" data-item="${id}" title="${im.label}">${it.emoji}<span class="iname" style="color:${im.color}">${it.name}</span></div>`;
   }).join('')}</div>`;
   inner.querySelectorAll('.closet-item').forEach(el=> el.addEventListener('click', ()=> toggleEquip(el.dataset.item)));
 }
@@ -2267,19 +2289,19 @@ function renderGuide(){
       <p class="guide-p">Rolled once, the moment an egg is created — this is permanent for that dino and shown as a colored badge on its card.</p>
       ${rows}
       <div class="guide-section-title">Life Stages & Credits</div>
-      <p class="guide-p">Every Galaxy or 1,000 Bits earns you a <b>Credit</b> — nothing happens automatically. Spend it however you like: hatch a new egg, evolve an owned dino one stage (${STAGE_ORDER.map(s=>STAGE_LABEL[s]).join(' → ')}), or once a dino is fully grown, unlock it a permanent surprise item instead. Hatching itself is free — just a short wait. Each dino can only level up once every 90 seconds, so a big gift plays out as a moment to watch, not an instant jump.</p>
+      <p class="guide-p">Every Galaxy or 1,000 Bits earns you a <b>Credit</b> — nothing happens automatically. Spend it however you like: hatch a new egg, evolve an owned dino one stage (${STAGE_ORDER.map(s=>STAGE_LABEL[s]).join(' → ')}), or once a dino is fully grown, unlock it a permanent surprise item instead — and items roll their own rarity too (see the Items tab). Hatching itself is free — just a short wait. Each dino can only level up once every 90 seconds, so a big gift plays out as a moment to watch, not an instant jump.</p>
       <div class="guide-section-title">Actions Change As You Grow</div>
       <p class="guide-p">Every stage plays differently — 5 actions each, every one with its own sound. Hatchlings ${STAGE_ACTIONS.hatchling.map(k=>ACTION_DEFS[k].icon+' '+ACTION_DEFS[k].label).join(', ')}. Juveniles trade the baby stuff for ${STAGE_ACTIONS.juvenile.filter(k=>!STAGE_ACTIONS.hatchling.includes(k)).map(k=>ACTION_DEFS[k].icon+' '+ACTION_DEFS[k].label).join(', ')}. Adults get ${STAGE_ACTIONS.adult.filter(k=>!STAGE_ACTIONS.juvenile.includes(k)).map(k=>ACTION_DEFS[k].icon+' '+ACTION_DEFS[k].label).join(', ')}. Evolving isn't just a bigger dino — it's a whole new playset.</p>
     `;
   } else {
-    const bySlot = {};
-    ITEM_POOL.forEach(it=>{ const slot = SLOT_MAP[it.id]||'hand'; (bySlot[slot]=bySlot[slot]||[]).push(it); });
-    const order = ['head','face','neck','body','aura','feet','hand'];
-    el.innerHTML = `<p class="guide-p">All ${ITEM_POOL.length} items, unlocked one at a time — you'll never get the same one twice. Yours forever once collected.</p>` +
-      order.filter(s=>bySlot[s]).map(slot=>
-        `<div class="guide-section-title">${SLOT_LABELS[slot]} (${bySlot[slot].length})</div>
-         <div class="closet-grid">${bySlot[slot].map(it=>`<div class="closet-item"><span style="font-size:20px">${it.emoji}</span><span class="iname">${it.name}</span></div>`).join('')}</div>`
-      ).join('');
+    const byTier = {};
+    ITEM_POOL.forEach(it=> (byTier[it.rarity] = byTier[it.rarity] || []).push(it));
+    el.innerHTML = `<p class="guide-p">All ${ITEM_POOL.length} items, unlocked one at a time per dino — never a duplicate, yours forever. Every surprise item rolls a <b>rarity first</b>, with the exact same odds as hatching a dino, then picks something that dino doesn't own from that tier. Two hunts, one club: rare dinos <i>and</i> rare items.</p>` +
+      RARITY_TABLE.slice().reverse().map(([label,key,pct])=>{
+        const meta = RARITY_META[key]; const items = byTier[key]||[];
+        return `<div class="guide-section-title"><span class="rarity-badge ${meta.cls}">${meta.symbol} ${label}</span> <span style="opacity:.65; font-weight:600; font-size:11px;">${items.length} item${items.length===1?'':'s'} · ${(pct*100).toFixed(1)}% roll</span></div>
+         <div class="closet-grid">${items.map(it=>`<div class="closet-item" title="${SLOT_LABELS[SLOT_MAP[it.id]||'hand']}"><span style="font-size:20px">${it.emoji}</span><span class="iname" style="color:${meta.color}">${it.name}</span></div>`).join('')}</div>`;
+      }).join('');
   }
 }
 document.getElementById('openGuide').addEventListener('click', ()=>{
@@ -2379,7 +2401,11 @@ function renderTable(){
     </tr>`;
     if(expandedId !== d.id) return row;
     const equipped = (d.equipped||[]).map(id=> ITEM_POOL.find(i=>i.id===id)).filter(Boolean);
-    const closetIcons = ITEM_POOL.map(it => `<span class="${(d.closet||[]).includes(it.id)?'owned':''}" title="${it.name}">${it.emoji}</span>`).join('');
+    const closetIcons = ITEM_POOL.map(it => {
+      const im = RARITY_META[it.rarity] || RARITY_META.common;
+      const has = (d.closet||[]).includes(it.id);
+      return `<span class="${has?'owned':''}" title="${it.name} — ${im.label}" style="${has?`box-shadow:0 0 0 1px ${im.color}; border-radius:4px;`:''}">${it.emoji}</span>`;
+    }).join('');
     const ownerRank = rankFor(ownerStat.totalDays);
     const bestMeta = RARITY_META[ownerStat.bestRarityKey] || RARITY_META.common;
     return row + `<tr class="detail-row"><td colspan="7"><div class="detail-inner">
