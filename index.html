@@ -92,10 +92,10 @@
     border:1px dashed rgba(22,36,13,.7); border-radius:8px; animation:hintBlink 1.9s ease-in-out infinite; }
   @keyframes hintBlink{ 0%,100%{ opacity:1; } 50%{ opacity:.45; } }
 
-  /* ---- Name-your-egg form in the spend modal ---- */
-  .egg-name-form input{ width:100%; box-sizing:border-box; background:#0d1f17; border:1px solid rgba(244,239,230,.28);
+  /* ---- Name-your-egg + PIN forms in modals ---- */
+  .egg-name-form input, .pin-form input{ width:100%; box-sizing:border-box; background:#0d1f17; border:1px solid rgba(244,239,230,.28);
     border-radius:10px; padding:11px 12px; color:var(--cream); font-family:'Fredoka'; font-size:14.5px; outline:none; }
-  .egg-name-form input:focus{ border-color:var(--amber); box-shadow:0 0 0 2px rgba(242,177,52,.25); }
+  .egg-name-form input:focus, .pin-form input:focus{ border-color:var(--amber); box-shadow:0 0 0 2px rgba(242,177,52,.25); }
 
   /* ---- Physical SELECT button on the shell ---- */
   .select-row{ display:flex; flex-direction:column; align-items:center; margin-top:10px; gap:2px; position:relative; z-index:2; }
@@ -309,6 +309,7 @@
               </div>
       <div class="hint">Don't have a dino yet? Gift a Galaxy or 1,000 Bits on stream to join the club!</div>
       <button class="secondary" id="openShowcase" style="width:100%; margin-top:14px; display:none;">📸 My Collection — share it!</button>
+      <button class="secondary" id="openPinBtn" style="width:100%; margin-top:8px; display:none;">🔒 Protect my Credits — set a PIN</button>
       <button class="secondary" id="openLeaderboard" style="width:100%; margin-top:8px;">🏆 View Leaderboards</button>
       <button class="secondary" id="openGuide" style="width:100%; margin-top:8px;">📖 How It Works</button>
       <div class="mode-link"><button class="linklike" id="toOwnerBtn">🔧 Streamer? Open the club dashboard →</button></div>
@@ -459,6 +460,13 @@
   </div>
 </div>
 
+<div class="gate-overlay" id="pinOverlay" style="display:none">
+  <div class="lb-card">
+    <div id="pinBody"></div>
+    <button class="secondary" id="closePin" style="width:100%; margin-top:10px;">Close</button>
+  </div>
+</div>
+
 <div class="milestone-overlay" id="milestoneOverlay" style="display:none">
   <div class="ms-confetti" aria-hidden="true"></div>
   <div class="ms-card" id="milestoneCard"></div>
@@ -485,6 +493,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getDatabase, ref as fbRef, set as fbSet, get as fbGet, onValue as fbOnValue }
   from "https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCB-fUi-H5ve2kl3Epoyo8NZpOOpCnWVtE",
@@ -498,6 +507,7 @@ const firebaseConfig = {
 };
 const fbApp = initializeApp(firebaseConfig);
 const db = getDatabase(fbApp);
+const fbAuth = getAuth(fbApp);
 
 /* ============================ CONFIG (shared by both views) ============================ */
 const SPECIES_NAMES = { rex:'T-Rex', tri:'Triceratops', raptor:'Raptor', steggo:'Stegosaurus',
@@ -619,7 +629,7 @@ const MIN_STAGE_GAP_MS = 90000;   // minimum time between any two stage/item eve
 const SAVE_TIMEOUT_MS = 10000;    // don't let a hung Firebase write freeze the UI forever
 
 function getOwnerStats(owner){
-  const h = normalize(owner);
+  const h = okey(owner);
   if(!ownerStats[h]) ownerStats[h] = {
     owner: (owner||'').trim(), dinos:[], activeDinoId:null, credits:0,
     totalDays:0, currentStreak:0, longestStreak:0, lastDate:null,
@@ -650,15 +660,27 @@ function maybeUpgradeBestRarity(stats, rarityKey){
   }
 }
 
-async function save(){
+async function save(ownerHandle){
   try{
-    const writes = Promise.all([
-      fbSet(fbRef(db, 'settings'), settings),
-      fbSet(fbRef(db, 'ownerStats'), ownerStats),
-    ]);
+    /* With a handle: write only that member's record. Smaller writes, and two people
+       saving at the same moment can no longer clobber each other's unrelated data.
+       Without: full write (settings changes, resets, multi-member sweeps). */
+    const writes = ownerHandle
+      ? fbSet(fbRef(db, 'ownerStats/' + okey(ownerHandle)), getOwnerStats(ownerHandle))
+      : Promise.all([
+          fbSet(fbRef(db, 'settings'), settings),
+          fbSet(fbRef(db, 'ownerStats'), ownerStats),
+        ]);
     const timeout = new Promise((_,reject)=> setTimeout(()=> reject(new Error('save timed out')), SAVE_TIMEOUT_MS));
     await Promise.race([writes, timeout]);
   }catch(e){ console.warn('firebase save failed or timed out — check your connection', e); }
+}
+/* connSettings persists so the dashboard reconnects after reload — but the Streamer.bot
+   password must never sit in the shared database. It stays on this device only. */
+function persistConnSettings(){
+  const safe = JSON.parse(JSON.stringify(connSettings));
+  if(safe.sbot) safe.sbot.pass = '';
+  fbSet(fbRef(db, 'connSettings'), safe).catch(()=>{});
 }
 function startFirebaseSync(){
   fbOnValue(fbRef(db, 'settings'), (snap)=>{ if(snap.val()) settings = Object.assign(settings, snap.val()); });
@@ -673,6 +695,10 @@ function uid(){ return Math.random().toString(36).slice(2,9); }
 function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 function rollRarity(){ const r=Math.random(); let acc=0; for(const [label,key,p] of RARITY_TABLE){ acc+=p; if(r<=acc) return {label,key}; } return {label:'Common',key:'common'}; }
 function normalize(h){ return (h||'').trim().replace(/^@/,'').toLowerCase(); }
+/* Firebase keys can't contain . # $ [ ] / — but TikTok handles often contain periods.
+   All ownerStats indexing and database paths go through this; ',' can't appear in a
+   handle, so the mapping is collision-free, and legacy dot-free keys are unchanged. */
+function okey(h){ return normalize(h).replace(/[.#$\[\]\/]/g, ','); }
 function showToast(text){
   const t = document.getElementById('toast'); t.textContent = text; t.classList.add('show');
   clearTimeout(showToast._tm); showToast._tm = setTimeout(()=> t.classList.remove('show'), 2600);
@@ -745,7 +771,7 @@ function grantCredit(owner, count){
   stats.totalGalaxiesAllTime = (stats.totalGalaxiesAllTime||0) + count;
   stats.credits = (stats.credits||0) + count;
   showToast(`🌌 ${owner} earned ${count>1?count+' Credits':'a Credit'} to spend! (${stats.credits} available)`);
-  save();
+  save(owner);
   renderCurrentView();
 }
 function spendOnNewEgg(owner, name){
@@ -809,7 +835,7 @@ async function removeDino(owner, dinoId){
   stats.dinos = stats.dinos.filter(x=>x.id!==dinoId);
   if(stats.activeDinoId === dinoId) stats.activeDinoId = stats.dinos[0] ? stats.dinos[0].id : null;
   confirmRemoveId = null;
-  await save();
+  await save(owner);
   renderCurrentView();
   if(d) showToast(`Removed ${d.name} from ${owner}'s collection.`);
 }
@@ -1254,6 +1280,7 @@ function renderPlayerScreen(){
     updateSprite3D(null);
     document.getElementById('creditAlert').style.display = 'none';
     selectRow.style.visibility = 'hidden'; showcaseBtn.style.display = 'none';
+    document.getElementById('openPinBtn').style.display = 'none';
     return;
   }
 
@@ -1261,10 +1288,13 @@ function renderPlayerScreen(){
   updateCreditAlert(stats);
   selectRow.style.visibility = stats.dinos.length > 1 ? 'visible' : 'hidden';
   showcaseBtn.style.display = stats.dinos.length ? '' : 'none';
+  const pinBtn = document.getElementById('openPinBtn');
+  pinBtn.style.display = '';
+  pinBtn.textContent = stats.pinHash ? '🔒 Credit PIN is ON — manage' : '🔒 Protect my Credits — set a PIN';
   if(stats.pendingMilestone && !milestoneShowing){
     const days = stats.pendingMilestone;
     delete stats.pendingMilestone;
-    save();
+    save(currentOwnerHandle);
     showMilestoneCelebration(days);
   }
 
@@ -1278,7 +1308,7 @@ function renderPlayerScreen(){
   }
 
   const d = current;
-  if(reconcileHatch(d)) save(); // fires the moment the timer is actually up, even if nobody re-searches
+  if(reconcileHatch(d)) save(d.owner); // fires the moment the timer is actually up, even if nobody re-searches
   screen.classList.add('has-dino');
   screenMsg.style.display = 'none'; screenContent.style.display = 'flex';
   document.getElementById('pName').textContent = d.name;
@@ -1390,7 +1420,7 @@ async function toggleEquip(itemId){
   const idx = current.equipped.indexOf(itemId);
   if(idx>=0) current.equipped.splice(idx,1);
   else { if(current.equipped.length >= MAX_EQUIPPED) current.equipped.shift(); current.equipped.push(itemId); }
-  await save(); renderPlayerScreen();
+  await save(current.owner); renderPlayerScreen();
 }
 
 function updateCooldownUI(){
@@ -1429,7 +1459,7 @@ function cycleActiveDino(){
   closetOpen = false;
   playSelectBeep();
   showToast(`👉 Now showing ${next.name} (${idx+2 > stats.dinos.length ? 1 : idx+2}/${stats.dinos.length})`);
-  save();
+  save(currentOwnerHandle);
   renderPlayerScreen();
 }
 document.getElementById('selectBtn').addEventListener('click', cycleActiveDino);
@@ -1672,12 +1702,109 @@ document.getElementById('shareCardBtn').addEventListener('click', async ()=>{
   }
 });
 
+/* ============================ PER-VIEWER CREDIT PIN ============================
+   Stops other viewers from spending someone's Credits by just typing their handle.
+   Honest scope: a casual-griefing barrier, not cryptography — the database itself is
+   open, so someone technical can bypass it. PINs are stored as salted SHA-256 hashes
+   so nobody's real digits are ever readable in the database. Viewing, petting, and
+   feeding stay open for everyone by design — only spending is locked. */
+const sessionUnlocked = {}; // per-tab, in-memory: unlock once per visit
+async function hashPin(handle, pin){
+  const data = new TextEncoder().encode('dinoclub:' + normalize(handle) + ':' + pin);
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(buf)).map(b=> b.toString(16).padStart(2,'0')).join('');
+}
+function needsPinUnlock(handle){
+  const stats = getOwnerStats(handle);
+  return !!stats.pinHash && !sessionUnlocked[normalize(handle)];
+}
+function closePinModal(){ document.getElementById('pinOverlay').style.display = 'none'; }
+function renderPinManageModal(){
+  const stats = getOwnerStats(currentOwnerHandle);
+  const body = document.getElementById('pinBody');
+  if(!stats.pinHash){
+    body.innerHTML = `
+      <h3>🔒 Set a Credit PIN</h3>
+      <p>Locks spending for @${currentOwnerHandle} — anyone can still visit, pet, and feed your dinos, but only you can spend Credits. Pick 4–6 digits you don't use anywhere else.</p>
+      <div class="pin-form">
+        <input id="pinNew" inputmode="numeric" maxlength="6" placeholder="New PIN (4–6 digits)" autocomplete="off">
+        <input id="pinNew2" inputmode="numeric" maxlength="6" placeholder="Repeat PIN" autocomplete="off" style="margin-top:6px;">
+        <button id="pinSaveBtn" style="width:100%; margin-top:10px;">🔒 Lock my Credits</button>
+      </div>`;
+    document.getElementById('pinSaveBtn').addEventListener('click', async ()=>{
+      const a = document.getElementById('pinNew').value.trim(), b = document.getElementById('pinNew2').value.trim();
+      if(!/^\d{4,6}$/.test(a)){ showToast('PIN must be 4–6 digits'); return; }
+      if(a !== b){ showToast("PINs don't match — try again"); return; }
+      stats.pinHash = await hashPin(currentOwnerHandle, a);
+      sessionUnlocked[normalize(currentOwnerHandle)] = true; // they just set it themselves
+      await save(currentOwnerHandle);
+      closePinModal();
+      showToast('🔒 PIN set — your Credits are protected!');
+      renderPlayerScreen();
+    });
+  } else {
+    body.innerHTML = `
+      <h3>🔒 PIN protection is ON</h3>
+      <p>Spending Credits for @${currentOwnerHandle} needs your PIN. Enter it to change it, or leave the new PIN empty to remove protection. Forgot it? Ask the streamer to clear it from the dashboard.</p>
+      <div class="pin-form">
+        <input id="pinOld" inputmode="numeric" maxlength="6" placeholder="Current PIN" autocomplete="off">
+        <input id="pinNew" inputmode="numeric" maxlength="6" placeholder="New PIN (empty = remove)" autocomplete="off" style="margin-top:6px;">
+        <button id="pinSaveBtn" style="width:100%; margin-top:10px;">Update</button>
+      </div>`;
+    document.getElementById('pinSaveBtn').addEventListener('click', async ()=>{
+      const oldPin = document.getElementById('pinOld').value.trim();
+      const newPin = document.getElementById('pinNew').value.trim();
+      if(await hashPin(currentOwnerHandle, oldPin) !== stats.pinHash){ showToast('❌ Wrong current PIN'); return; }
+      if(newPin === ''){
+        stats.pinHash = null;
+        delete sessionUnlocked[normalize(currentOwnerHandle)];
+        await save(currentOwnerHandle); closePinModal(); renderPlayerScreen();
+        showToast('🔓 PIN removed — spending is open again');
+        return;
+      }
+      if(!/^\d{4,6}$/.test(newPin)){ showToast('New PIN must be 4–6 digits'); return; }
+      stats.pinHash = await hashPin(currentOwnerHandle, newPin);
+      sessionUnlocked[normalize(currentOwnerHandle)] = true;
+      await save(currentOwnerHandle); closePinModal();
+      showToast('🔒 PIN updated');
+    });
+  }
+}
+document.getElementById('openPinBtn').addEventListener('click', ()=>{
+  document.getElementById('pinOverlay').style.display = 'flex';
+  renderPinManageModal();
+});
+document.getElementById('closePin').addEventListener('click', closePinModal);
+
 /* ============================ SPEND A CREDIT ============================ */
 let spendNamingEgg = false; // true while the "name your new egg" form is showing
 function renderSpendModal(){
   const stats = getOwnerStats(currentOwnerHandle);
   const subtitle = document.getElementById('spendCreditCount');
   const list = document.getElementById('spendList');
+
+  if(needsPinUnlock(currentOwnerHandle)){
+    subtitle.textContent = 'This account is PIN-protected.';
+    list.innerHTML = `<div class="pin-form">
+      <input id="spendPinInput" inputmode="numeric" maxlength="6" placeholder="Enter PIN to spend" autocomplete="off">
+      <button id="spendPinBtn" style="width:100%; margin-top:10px;">🔓 Unlock</button>
+      <div style="font-size:11px; color:var(--dim); margin-top:8px; text-align:center;">Forgot it? Ask the streamer to clear it from the dashboard.</div>
+    </div>`;
+    const input = document.getElementById('spendPinInput');
+    const tryUnlock = async ()=>{
+      if(await hashPin(currentOwnerHandle, input.value.trim()) === getOwnerStats(currentOwnerHandle).pinHash){
+        sessionUnlocked[normalize(currentOwnerHandle)] = true;
+        renderSpendModal();
+      } else {
+        showToast('❌ Wrong PIN');
+        input.value = ''; input.focus();
+      }
+    };
+    document.getElementById('spendPinBtn').addEventListener('click', tryUnlock);
+    input.addEventListener('keydown', e=>{ if(e.key==='Enter') tryUnlock(); });
+    input.focus();
+    return;
+  }
 
   if(spendNamingEgg){
     subtitle.textContent = 'Name your new dino — pick something good, it sticks forever!';
@@ -1691,7 +1818,7 @@ function renderSpendModal(){
       if(spendOnNewEgg(currentOwnerHandle, input.value)){
         spendNamingEgg = false;
         current = getActiveDino(currentOwnerHandle);
-        await save();
+        await save(currentOwnerHandle);
         renderPlayerScreen();
         if(getOwnerStats(currentOwnerHandle).credits <= 0) document.getElementById('spendOverlay').style.display='none';
         else renderSpendModal();
@@ -1737,7 +1864,7 @@ function renderSpendModal(){
       else if(action==='item') ok = spendOnItem(currentOwnerHandle, id);
       if(ok){
         current = getActiveDino(currentOwnerHandle);
-        await save();
+        await save(currentOwnerHandle);
         renderPlayerScreen();
         renderSpendModal();
         if(getOwnerStats(currentOwnerHandle).credits <= 0) document.getElementById('spendOverlay').style.display='none';
@@ -2026,7 +2153,7 @@ async function doInteraction(kind){
     playShowOff();
     popFx('🌟'); popFx('✨');
   }
-  await save(); renderPlayerScreen();
+  await save(current.owner); renderPlayerScreen();
 }
 
 document.getElementById('actions').addEventListener('click', (e)=>{
@@ -2044,7 +2171,7 @@ async function doSearch(){
   kickAudio(); // searching is a user gesture — fully unlock audio now
   const h = normalize(handle);
   closetOpen = false;
-  if(!ownerStats[h]){
+  if(!ownerStats[okey(h)]){
     current = null; currentOwnerHandle = null;
     const screen = document.getElementById('screen');
     screen.classList.remove('has-dino');
@@ -2052,6 +2179,7 @@ async function doSearch(){
     document.getElementById('creditAlert').style.display = 'none';
     document.getElementById('selectRow').style.visibility = 'hidden';
     document.getElementById('openShowcase').style.display = 'none';
+    document.getElementById('openPinBtn').style.display = 'none';
     const screenMsg = document.getElementById('screenMsg');
     screenMsg.innerHTML = `😢 No dino found for<br><b>@${h}</b><br>yet. Gift a Galaxy or 1,000 Bits to join!`;
     screenMsg.style.display = '';
@@ -2063,7 +2191,7 @@ async function doSearch(){
   }
   currentOwnerHandle = h;
   current = getActiveDino(h);
-  if(current && reconcileHatch(current)) save();
+  if(current && reconcileHatch(current)) save(h);
   renderPlayerScreen();
 }
 document.getElementById('searchBtn').addEventListener('click', doSearch);
@@ -2258,7 +2386,7 @@ function renderTable(){
       <div class="detail-block"><div class="k">Owner record</div><div>${ownerRank.icon} ${ownerRank.title} · ${ownerStat.totalDays||0} days played · ${ownerStat.credits||0} unspent Credits<br>🔥 ${ownerStat.currentStreak||0} day streak (best ${ownerStat.longestStreak||0}) · best pull ${bestMeta.symbol} ${bestMeta.label}<br>🦖 ${(ownerStat.speciesAdult||[]).length}/${SPECIES.length} species raised to Adult · 📦 ${ownerStat.dinos.length} dino${ownerStat.dinos.length===1?'':'s'} in collection</div></div>
       <div class="detail-block"><div class="k">Currently equipped</div><div>${equipped.length? equipped.map(i=>i.emoji+' '+i.name).join(', ') : 'Nothing equipped'}</div></div>
       <div class="detail-block"><div class="k">Closet (${(d.closet||[]).length}/${ITEM_POOL.length}) — permanent, kept forever</div><div class="closet-icons">${closetIcons}</div></div>
-      <div class="detail-block"><button class="warn small" data-remove="${d.id}" data-owner="${d.owner}">${isConfirming?'Click again to confirm':'Remove this dino'}</button></div>
+      <div class="detail-block"><button class="warn small" data-remove="${d.id}" data-owner="${d.owner}">${isConfirming?'Click again to confirm':'Remove this dino'}</button>${ownerStat.pinHash ? ` <button class="small secondary" data-clearpin="${d.owner}" style="margin-left:8px">🔓 Clear PIN</button>` : ''}</div>
     </div></td></tr>`;
   }).join('');
   body.querySelectorAll('tr[data-id]').forEach(tr=>{
@@ -2270,6 +2398,14 @@ function renderTable(){
     });
   });
   body.querySelectorAll('[data-remove]').forEach(btn=> btn.addEventListener('click', (e)=>{ e.stopPropagation(); removeDino(btn.dataset.owner, btn.dataset.remove); }));
+  body.querySelectorAll('[data-clearpin]').forEach(btn=> btn.addEventListener('click', async (e)=>{
+    e.stopPropagation();
+    const o = getOwnerStats(btn.dataset.clearpin);
+    o.pinHash = null;
+    await save(btn.dataset.clearpin);
+    renderTable();
+    showToast('🔓 PIN cleared for @' + btn.dataset.clearpin);
+  }));
 }
 
 
@@ -2279,7 +2415,7 @@ document.getElementById('ownerInput').addEventListener('input', ()=>{
   const owner = document.getElementById('ownerInput').value.trim();
   const hint = document.getElementById('ownerHint');
   if(!owner){ hint.textContent=''; return; }
-  const existing = ownerStats[normalize(owner)];
+  const existing = ownerStats[okey(owner)];
   if(!existing || !existing.dinos.length){ hint.textContent = '✨ New member — this Credit lets them hatch their first egg.'; hint.style.color='var(--fern)'; }
   else { hint.textContent = `📦 ${existing.dinos.length} dino${existing.dinos.length===1?'':'s'} in collection, ${existing.credits||0} unspent Credit${(existing.credits||0)===1?'':'s'} already.`; hint.style.color='var(--amber)'; }
 });
@@ -2290,7 +2426,7 @@ document.getElementById('giftBtn').addEventListener('click', async ()=>{
   const original = btn.textContent;
   btn.textContent = 'Saving…'; btn.disabled = true;
   grantCredit(owner);
-  await save();
+  await save(owner);
   btn.textContent = original; btn.disabled = false;
   document.getElementById('ownerInput').select();
   document.getElementById('ownerInput').dispatchEvent(new Event('input'));
@@ -2312,6 +2448,26 @@ document.getElementById('log-tikfinity').addEventListener('click', ()=>{ const b
 document.getElementById('log-sbot').addEventListener('click', ()=>{ const b=document.getElementById('log-box-sbot'); b.style.display = b.style.display==='none'?'block':'none'; });
 
 let tfSocket = null, tfRetry = null;
+/* Per viewer+gift combo tracker for streakDelta. `max` = highest count already credited
+   in the current combo; `climbed` = we witnessed the count climbing (so a repeat of that
+   same count is a summary/duplicate, not a new gift); 60s idle gap = fresh combo. */
+const giftStreaks = {};
+function streakDelta(user, gift, count){
+  const key = normalize(user) + '|' + gift.toLowerCase();
+  const now = Date.now();
+  let s = giftStreaks[key];
+  if(!s || now - s.at > 60000) s = giftStreaks[key] = { max:0, at:now, climbed:false };
+  s.at = now;
+  if(count > s.max){
+    if(s.max > 0) s.climbed = true;
+    const delta = count - s.max;
+    s.max = count;
+    return delta;
+  }
+  if(count === s.max && s.climbed) return 0; // summary or duplicate of a combo credited tap-by-tap
+  s.max = count; s.climbed = false;          // fresh gift/combo starting over
+  return count;
+}
 function connectTikfinity(){
   let url = document.getElementById('tikfinity-url').value.trim();
   const giftWatch = document.getElementById('tikfinity-gift').value.trim() || 'Galaxy';
@@ -2337,27 +2493,39 @@ function connectTikfinity(){
     clearTimeout(tfRetry); if(connSettings.tikfinity.enabled) tfRetry = setTimeout(connectTikfinity, 4000);
   };
   tfSocket.onerror = ()=>{ setDot('tikfinity','err'); logLine('tikfinity','error'); };
+  /* Streak-safe accounting. TikTok gifts — including big ones like Galaxy — can be
+     combo-tapped, arriving as repeated events with a climbing repeatCount, sometimes
+     followed by a summary event, and tools differ in which of those they forward.
+     Rather than guess, credit only the DELTA each event proves: its count minus what
+     this viewer's current combo already earned. N galaxies always = N Credits, whether
+     we see every tap, only the final total, or both — and taps credit live, mid-combo. */
   tfSocket.onmessage = (msg)=>{
     let data; try{ data = JSON.parse(msg.data); }catch(e){ return; }
-    const evt = data.event || data.name || (data.type);
-    logLine('tikfinity', JSON.stringify(data).slice(0,160));
-    if(evt !== 'gift') return;
+    const evt = data.event || data.name || data.type;
+    if(evt !== 'gift'){ logLine('tikfinity', JSON.stringify(data).slice(0,160)); return; }
     const payload = data.data || data;
-    const giftName = payload.giftName || payload.gift_name || '';
-    const repeatEnd = payload.repeatEnd !== undefined ? payload.repeatEnd : true;
+    const giftName = payload.giftName || payload.gift_name
+      || (payload.gift && (payload.gift.name || payload.gift.gift_name))
+      || (payload.giftDetails && payload.giftDetails.giftName) || '';
+    const count = Math.max(1, payload.repeatCount || payload.repeat_count || 1);
     const uniqueId = (payload.user && (payload.user.uniqueId || payload.user.nickname)) || payload.uniqueId || payload.nickname;
-    if(!uniqueId) return;
-    if(giftName.toLowerCase() !== giftWatch.toLowerCase()) return;
-    if(repeatEnd === false) return;
-    const count = Math.max(1, payload.repeatCount || 1);
-    grantCredit(uniqueId, count);
+    if(!giftName){ logLine('tikfinity', '⚠️ gift event with no name field — raw: ' + JSON.stringify(payload).slice(0,220)); return; }
+    if(giftName.toLowerCase() !== giftWatch.toLowerCase()){
+      logLine('tikfinity', `gift "${giftName}" ×${count} from @${uniqueId||'?'} — ignored (watching "${giftWatch}")`);
+      return;
+    }
+    if(!uniqueId){ logLine('tikfinity', `⚠️ "${giftName}" matched but no username found — raw: ` + JSON.stringify(payload).slice(0,220)); return; }
+    const delta = streakDelta(uniqueId, giftName, count);
+    if(delta <= 0){ logLine('tikfinity', `combo summary "${giftName}" ×${count} from @${uniqueId} — already counted`); return; }
+    logLine('tikfinity', `🌌 "${giftName}" ×${count}${delta < count ? ` (+${delta} new)` : ''} from @${uniqueId} — ${delta} Credit${delta===1?'':'s'} granted!`);
+    grantCredit(uniqueId, delta);
   };
 }
 document.getElementById('connect-tikfinity').addEventListener('click', ()=>{
   connSettings.tikfinity.enabled = true;
   connSettings.tikfinity.url = document.getElementById('tikfinity-url').value.trim();
   connSettings.tikfinity.gift = document.getElementById('tikfinity-gift').value.trim();
-  fbSet(fbRef(db, 'connSettings'), connSettings).catch(()=>{});
+  persistConnSettings();
   if(tfSocket) try{ tfSocket.close(); }catch(e){}
   connectTikfinity();
 });
@@ -2413,7 +2581,7 @@ document.getElementById('connect-sbot').addEventListener('click', ()=>{
   connSettings.sbot.bitsField = document.getElementById('sbot-bits-field').value.trim();
   connSettings.sbot.bitsUserField = document.getElementById('sbot-bits-user-field').value.trim();
   connSettings.sbot.bitsPerGalaxy = document.getElementById('sbot-bits-per-galaxy').value.trim();
-  fbSet(fbRef(db, 'connSettings'), connSettings).catch(()=>{});
+  persistConnSettings();
   connectStreamerbot();
 });
 
@@ -2451,6 +2619,12 @@ document.getElementById('gateInput').addEventListener('keydown', e=>{ if(e.key==
 
 /* ============================ INIT ============================ */
 (async function init(){
+  /* Anonymous sign-in: invisible to visitors, no account, no prompt — but it lets the
+     database rules require auth, which shuts out all anonymous drive-by REST access.
+     Non-fatal if the provider isn't enabled yet, so the app keeps working while open
+     rules are still in place. */
+  try{ await signInAnonymously(fbAuth); }
+  catch(e){ console.warn('anonymous sign-in unavailable — enable Anonymous in Firebase Console → Authentication → Sign-in method', e); }
   try{
     const [sSnap, stSnap, csSnap] = await Promise.all([
       fbGet(fbRef(db,'settings')), fbGet(fbRef(db,'ownerStats')), fbGet(fbRef(db,'connSettings')),
