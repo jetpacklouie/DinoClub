@@ -313,7 +313,7 @@
       <button class="secondary" id="openLeaderboard" style="width:100%; margin-top:8px;">🏆 View Leaderboards</button>
       <button class="secondary" id="openGuide" style="width:100%; margin-top:8px;">📖 How It Works</button>
       <div class="mode-link"><button class="linklike" id="toOwnerBtn">🔧 Streamer? Open the club dashboard →</button></div>
-      <div id="versionStamp" style="text-align:center; font-size:10px; color:var(--dim); opacity:.65; margin-top:10px;">Dino Club v2026.07.21-A · item rarity update</div>
+      <div id="versionStamp" style="text-align:center; font-size:10px; color:var(--dim); opacity:.65; margin-top:10px;">Dino Club v2026.07.21-B · Streamer.bot bits</div>
     </div>
   </div>
 </div>
@@ -2577,16 +2577,38 @@ function connectStreamerbot(){
       onDisconnect: ()=>{ setDot('sbot','off'); setStatus('sbot','Disconnected — auto-retrying'); logLine('sbot','disconnected'); },
       onError: (err)=>{ setDot('sbot','err'); setStatus('sbot','Connection error'); logLine('sbot','error: '+(err&&err.message||err)); },
       onData: (payload)=>{
-        logLine('sbot', JSON.stringify(payload).slice(0,160));
+        logLine('sbot', JSON.stringify(payload).slice(0,180));
+        /* PREFERRED PATH: a custom "dinoBits" broadcast from a Streamer.bot action, which
+           has already done the bit math and hands us clean {user, bits}. This avoids
+           guessing where bits live in Streamer.bot's raw Cheer event (it moves between
+           versions). A matching custom "dinoGift" broadcast works the same for gifts. */
+        const custom = (payload && payload.data && (payload.data.event === 'dinoBits' || payload.data.event === 'dinoGift'))
+          ? payload.data : (payload && (payload.event === 'dinoBits' || payload.event === 'dinoGift')) ? payload : null;
+        if(custom){
+          const user = custom.user || custom.userName || 'viewer';
+          if(custom.event === 'dinoGift'){
+            logLine('sbot', `🌌 dinoGift from @${user} — Credit granted!`);
+            grantCredit(user, Math.max(1, parseInt(custom.count,10) || 1));
+            return;
+          }
+          const bits = parseInt(custom.bits, 10) || 0;
+          const galaxyCount = Math.floor(bits / bitsPerGalaxy);
+          if(galaxyCount >= 1){
+            logLine('sbot', `🌌 dinoBits ${bits} from @${user} — ${galaxyCount} Credit${galaxyCount===1?'':'s'} granted!`);
+            grantCredit(user, galaxyCount);
+          } else {
+            logLine('sbot', `dinoBits ${bits} from @${user} — under ${bitsPerGalaxy}, no Credit`);
+          }
+          return;
+        }
+        // FALLBACK PATH: raw-event parsing via configurable field paths (best-effort).
         // Gift-name match (e.g. TikTok gifts relayed through Streamer.bot)
         const giftName = getPath(payload, giftPath);
         if(giftName !== undefined && String(giftName).toLowerCase() === giftWatch.toLowerCase()){
           const user = getPath(payload, userPath) || 'viewer';
           grantCredit(user);
         }
-        // Twitch Bits match — every full bitsPerGalaxy chunk is one Galaxy-equivalent,
-        // paced through the same queue as TikTok gift streaks so a huge cheer can't
-        // instantly max someone out.
+        // Twitch Bits match — every full bitsPerGalaxy chunk is one Galaxy-equivalent.
         const bitsVal = getPath(payload, bitsPath);
         if(typeof bitsVal === 'number' && bitsVal >= bitsPerGalaxy){
           const bitsUser = getPath(payload, bitsUserPath) || 'viewer';
